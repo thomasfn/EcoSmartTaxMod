@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Linq;
 
 namespace Eco.Mods.SmartTax
@@ -23,18 +21,26 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
 
-    [Eco, LocDisplayName("Smart Tax"), LocDescription("A smarter tax that applies rebates, tracks debt and aggregates transactions.")]
+    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Tax"), LocDescription("A smarter tax that applies rebates, tracks debt and aggregates transactions.")]
     public class SmartTax_LegalAction : LegalAction, IExecutiveAction, ICustomValidity
     {
-        [Eco, LocDescription("Where the money goes. Only Government Accounts are allowed."), GovernmentAccountsOnly] public GameValue<BankAccount> TargetBankAccount { get; set; } = Make.Treasury;
+        [Eco, LocDescription("Where the money goes. Only Government Accounts are allowed."), GovernmentAccountsOnly]
+        public GameValue<BankAccount> TargetBankAccount { get; set; } = Make.Treasury;
 
-        [Eco, Advanced, LocDescription("Which currency to collect the tax in.")] public GameValue<Currency> Currency { get; set; }
+        [Eco, Advanced, LocDescription("Which currency to collect the tax in.")]
+        public GameValue<Currency> Currency { get; set; }
 
-        [Eco, LocDescription("The amount that is going to be taxed.")] public GameValue<float> Amount { get; set; } = Make.GameValue(0f);
+        [Eco, LocDescription("The amount that is going to be taxed.")]
+        public GameValue<float> Amount { get; set; } = Make.GameValue(0f);
 
-        [Eco, Advanced, LocDescription("The player or group to tax.")] public GameValue<IAlias> Target { get; set; }
+        [Eco, Advanced, LocDescription("The player or group to tax.")]
+        public GameValue<IAlias> Target { get; set; }
 
-        [Eco, LocDescription("A custom name for the tax. If left blank, the name of the law will be used instead."), AllowNull] public string TaxCode { get; set; }
+        [Eco, LocDescription("A custom name for the tax. If left blank, the name of the law will be used instead."), AllowNull]
+        public string TaxCode { get; set; }
+
+        [Eco, LocDescription("If ticked, no notification will be published at all when the tax is applied. Will still notify when the tax is collected. Useful for high-frequency events like placing blocks or emitting pollution.")]
+        public bool Silent { get; set; } = false;
 
         public override LocString Description()
             => Localizer.Do($"Smart collect tax of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
@@ -46,7 +52,7 @@ namespace Eco.Mods.SmartTax
         {
             var targetBankAccount = this.TargetBankAccount?.Value(context).Val;
             var currency = this.Currency?.Value(context).Val;
-            var amount = this.Amount?.Value(context).Val;
+            var amount = this.Amount?.Value(context).Val ?? 0.0f;
             var alias = this.Target?.Value(context).Val;
             var taxCode = string.IsNullOrEmpty(this.TaxCode) ? description : this.TaxCode;
 
@@ -57,10 +63,17 @@ namespace Eco.Mods.SmartTax
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordTax(targetBankAccount, currency, taxCode, amount ?? 0.0f);
+                taxCard.RecordTax(targetBankAccount, currency, taxCode, amount);
             }
-            
-            return PostResult.Succeeded;
+
+            if (Silent)
+            {
+                return PostResult.Succeeded;
+            }
+            else
+            {
+                return new PostResult($"Issuing tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({taxCode})", true);
+            }
         }
     }
 }

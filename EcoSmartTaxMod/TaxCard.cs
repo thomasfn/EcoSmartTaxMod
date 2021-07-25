@@ -97,8 +97,16 @@ namespace Eco.Mods.SmartTax
         public override void OnLinkClicked(TooltipContext context) => context.Player.OpenInfoPanel(Localizer.Do($"Log for {this.UILink()}"), this.TaxLog.RenderToText(), "BankTransactions");
         public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view log.");
         public override LocString UILinkContent() => TextLoc.ItemIcon("Tax", Localizer.DoStr(this.Name));
+
+        public LocString DebtSummary()
+            => Localizer.DoStr(string.Join(", ",
+                 TaxDebts
+                    .GroupBy(taxDebt => taxDebt.Currency)
+                    .Select(grouping => $"{grouping.Key.UILink(grouping.Select(taxDebt => taxDebt.Amount).Sum() - TaxRebates.Where(taxRebate => taxRebate.Currency == grouping.Key).Select(taxRebate => taxRebate.Amount).Sum())}")
+               ));
+
         [Tooltip(100)] public override LocString Description()
-            => Localizer.Do($"{DescribeDebts()}\n{DescribeRebates()}");
+            => Localizer.Do($"Owes {DebtSummary()}.\n{DescribeDebts()}\n{DescribeRebates()}");
 
         public LocString DescribeDebts()
         {

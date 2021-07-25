@@ -85,17 +85,17 @@ namespace Eco.Mods.SmartTax
 
         #region Chat Commands
 
-        [ChatCommand("SmartTax", ChatAuthorizationLevel.User)]
-        public static void SmartTax() { }
+        [ChatCommand("Tax", ChatAuthorizationLevel.User)]
+        public static void Tax() { }
 
-        [ChatSubCommand("SmartTax", "Retrieves the player's tax card.", ChatAuthorizationLevel.User)]
-        public static void MyCard(User user)
+        [ChatSubCommand("Tax", "Retrieves the player's tax card.", ChatAuthorizationLevel.User)]
+        public static void Card(User user)
         {
             var taxCard = TaxCard.GetOrCreateForUser(user);
-            user.MsgLoc($"{taxCard.UILink()}");
+            user.MsgLoc($"{taxCard.UILink()} owes {taxCard.DebtSummary()}");
         }
 
-        [ChatSubCommand("SmartTax", "Performs a tax tick immediately.", ChatAuthorizationLevel.Admin)]
+        [ChatSubCommand("Tax", "Performs a tax tick immediately.", ChatAuthorizationLevel.Admin)]
         public static void TickNow(User user)
         {
             user.MsgLoc($"Running full tax tick...");
