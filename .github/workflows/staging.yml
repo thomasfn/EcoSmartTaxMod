@@ -1,0 +1,40 @@
+name: build for staging
+
+on:
+  push:
+    branches:
+      - 'staging'
+
+jobs:
+  build-mod:
+    runs-on: ubuntu-latest
+    env:
+      MODKIT_VERSION: 0.9.3.4-beta
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Fetch dependencies
+      run: dotnet restore ./EcoSmartTaxMod/EcoSmartTaxMod.csproj
+      env:
+        DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+    - name: Cache Eco dlls
+      id: cache-eco-dlls
+      uses: actions/cache@v2
+      with:
+        path: ./eco-dlls
+        key: ${{ env.MODKIT_VERSION }}-ref-dlls
+    - name: Download Eco dlls
+      if: steps.cache-eco-dlls.outputs.cache-hit != 'true'
+      run: sh fetch-eco-reference-assemblies.sh
+    - name: Build
+      run: dotnet build ./EcoSmartTaxMod/EcoSmartTaxMod.csproj --configuration Release --no-restore
+      env:
+        DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: mod-binaries-staging
+        path: EcoSmartTaxMod/bin/Release/netcoreapp3.1/EcoSmartTaxMod.*

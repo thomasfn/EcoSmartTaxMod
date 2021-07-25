@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>Eco.Mods.SmartTax</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Eco.Core">
+      <HintPath>..\eco-dlls\Eco.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Eco.Gameplay">
+      <HintPath>..\eco-dlls\Eco.Gameplay.dll</HintPath>
+    </Reference>
+    <Reference Include="Eco.ModKit">
+      <HintPath>..\eco-dlls\Eco.ModKit.dll</HintPath>
+    </Reference>
+    <Reference Include="Eco.Plugins">
+      <HintPath>..\eco-dlls\Eco.Plugins.dll</HintPath>
+    </Reference>
+    <Reference Include="Eco.Shared">
+      <HintPath>..\eco-dlls\Eco.Shared.dll</HintPath>
+    </Reference>
+    <Reference Include="Eco.Simulation">
+      <HintPath>..\eco-dlls\Eco.Simulation.dll</HintPath>
+    </Reference>
+    <Reference Include="Eco.Stats">
+      <HintPath>..\eco-dlls\Eco.Stats.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+  </ItemGroup>
+
+</Project>
