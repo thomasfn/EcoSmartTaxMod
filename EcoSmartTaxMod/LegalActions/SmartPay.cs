@@ -21,50 +21,50 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
 
-    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Tax"), LocDescription("A smarter tax that applies rebates, tracks debt and aggregates transactions.")]
-    public class SmartTax_LegalAction : LegalAction, IExecutiveAction, ICustomValidity
+    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), LocDescription("A smarter wage that tracks credit if the source account can't afford it.")]
+    public class SmartPay_LegalAction : LegalAction, IExecutiveAction, ICustomValidity
     {
-        [Eco, LocDescription("Where the money goes. Only Government Accounts are allowed."), GovernmentAccountsOnly]
-        public GameValue<BankAccount> TargetBankAccount { get; set; } = Make.Treasury;
+        [Eco, LocDescription("Where the money comes from. Only Government Accounts are allowed."), GovernmentAccountsOnly]
+        public GameValue<BankAccount> SourceBankAccount { get; set; } = Make.Treasury;
 
-        [Eco, Advanced, LocDescription("Which currency to collect the tax in.")]
+        [Eco, Advanced, LocDescription("Which currency to pay the wage in.")]
         public GameValue<Currency> Currency { get; set; }
 
-        [Eco, LocDescription("The amount that is going to be taxed.")]
+        [Eco, LocDescription("The amount that is going to be paid.")]
         public GameValue<float> Amount { get; set; } = Make.GameValue(0f);
 
-        [Eco, Advanced, LocDescription("The player or group to tax.")]
+        [Eco, Advanced, LocDescription("The player or group to pay.")]
         public GameValue<IAlias> Target { get; set; }
 
-        [Eco, LocDescription("A custom name for the tax. If left blank, the name of the law will be used instead."), AllowNull]
-        public string TaxCode { get; set; }
+        [Eco, LocDescription("A custom name for the wage. If left blank, the name of the law will be used instead."), AllowNull]
+        public string WageCode { get; set; }
 
-        [Eco, LocDescription("If ticked, no notification will be published at all when the tax is applied. Will still notify when the tax is collected. Useful for high-frequency events like placing blocks or emitting pollution.")]
+        [Eco, LocDescription("If ticked, no notification will be published at all when the wage is applied. Will still notify when the wage is paid. Useful for high-frequency events like placing blocks or emitting pollution.")]
         public GameValue<bool> Silent { get; set; } = new No();
 
         public override LocString Description()
-            => Localizer.Do($"Smart collect tax of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
+            => Localizer.Do($"Smart pay wage of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.SourceBankAccount.DescribeNullSafe()} to {this.Target.DescribeNullSafe()}.");
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
         PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
 
         private PostResult Do(LocString description, IContextObject context, Law law)
         {
-            var targetBankAccount = this.TargetBankAccount?.Value(context).Val;
+            var sourceBankAccount = this.SourceBankAccount?.Value(context).Val;
             var currency = this.Currency?.Value(context).Val;
             var amount = this.Amount?.Value(context).Val ?? 0.0f;
             var alias = this.Target?.Value(context).Val;
-            var taxCode = string.IsNullOrEmpty(this.TaxCode) ? description : this.TaxCode;
+            var wageCode = string.IsNullOrEmpty(this.WageCode) ? description : this.WageCode;
             var silent = this.Silent?.Value(context).Val ?? false;
 
-            if (targetBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
-            
+            if (sourceBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
+
             var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult(Localizer.DoStr("Taxation without target citizen skipped."), true); }
+            if (users == null || users.Length == 0) { return new PostResult(Localizer.DoStr("Payment without target citizen skipped."), true); }
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordTax(targetBankAccount, currency, taxCode, amount);
+                taxCard.RecordWage(sourceBankAccount, currency, wageCode, amount);
             }
 
             if (silent)
@@ -73,7 +73,7 @@ namespace Eco.Mods.SmartTax
             }
             else
             {
-                return new PostResult($"Issuing tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({taxCode})", true);
+                return new PostResult($"Issuing wage of {currency.UILinkContent(amount)} from {sourceBankAccount.UILink()} to {alias.UILinkGeneric()} ({wageCode})", true);
             }
         }
     }
