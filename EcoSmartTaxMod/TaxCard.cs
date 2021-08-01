@@ -47,17 +47,17 @@ namespace Eco.Mods.SmartTax
     }
 
     [Serialized]
-    public class WageCredit
+    public class PaymentCredit
     {
         [Serialized] public BankAccount SourceAccount { get; set; }
 
         [Serialized] public Currency Currency { get; set; }
 
-        [Serialized] public string WageCode { get; set; }
+        [Serialized] public string PaymentCode { get; set; }
 
         [Serialized] public float Amount { get; set; }
 
-        public LocString Description => Localizer.Do($"Wage of {Currency.UILinkContent(Amount)} from {SourceAccount.UILink()} ({WageCode})");
+        public LocString Description => Localizer.Do($"Payment of {Currency.UILinkContent(Amount)} from {SourceAccount.UILink()} ({PaymentCode})");
     }
 
     [Serialized, ForceCreateView]
@@ -67,7 +67,7 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public ThreadSafeList<TaxRebate> TaxRebates { get; private set; } = new ThreadSafeList<TaxRebate>();
 
-        [Serialized] public ThreadSafeList<WageCredit> WageCredits { get; private set; } = new ThreadSafeList<WageCredit>();
+        [Serialized] public ThreadSafeList<PaymentCredit> PaymentCredits { get; private set; } = new ThreadSafeList<PaymentCredit>();
 
         [Serialized] public TaxLog TaxLog { get; private set; } = new TaxLog();
 
@@ -92,14 +92,14 @@ namespace Eco.Mods.SmartTax
             taxEntry.Amount += amount;
         }
 
-        public void RecordWage(BankAccount sourceAccount, Currency currency, string wageCode, float amount)
+        public void RecordPayment(BankAccount sourceAccount, Currency currency, string paymentCode, float amount)
         {
             if (amount < Transfers.AlmostZero) { return; }
-            var wageCredit = WageCredits.GetOrCreate(
-                taxEntry => taxEntry.SourceAccount == sourceAccount && taxEntry.Currency == currency && taxEntry.WageCode == wageCode,
-                () => new WageCredit { SourceAccount = sourceAccount, Currency = currency, WageCode = wageCode, Amount = 0.0f }
+            var paymentCredit = PaymentCredits.GetOrCreate(
+                taxEntry => taxEntry.SourceAccount == sourceAccount && taxEntry.Currency == currency && taxEntry.PaymentCode == paymentCode,
+                () => new PaymentCredit { SourceAccount = sourceAccount, Currency = currency, PaymentCode = paymentCode, Amount = 0.0f }
             );
-            wageCredit.Amount += amount;
+            paymentCredit.Amount += amount;
         }
 
         public void RecordRebate(BankAccount targetAccount, Currency currency, string rebateCode, float amount)
@@ -128,21 +128,21 @@ namespace Eco.Mods.SmartTax
                 .Select(taxRebate => taxRebate.Amount)
                 .Sum();
 
-        public float GetWageSum(Func<WageCredit, bool> predicate)
-            => WageCredits
+        public float GetPaymentSum(Func<PaymentCredit, bool> predicate)
+            => PaymentCredits
                 .Where(predicate)
-                .Select(wageCredit => wageCredit.Amount)
+                .Select(paymentCredit => paymentCredit.Amount)
                 .Sum();
 
         public LocString DebtSummary()
             => TaxDebts.Any() ? Localizer.DoStr(string.Join(", ",
                  TaxDebts
                     .GroupBy(taxDebt => taxDebt.Currency)
-                    .Select(grouping => $"{grouping.Key.UILink(GetDebtSum(taxDebt => taxDebt.Currency == grouping.Key) - GetRebateSum(taxRebate => taxRebate.Currency == grouping.Key) - GetWageSum(wageCredit => wageCredit.Currency == grouping.Key))}")
+                    .Select(grouping => $"{grouping.Key.UILink(GetDebtSum(taxDebt => taxDebt.Currency == grouping.Key) - GetRebateSum(taxRebate => taxRebate.Currency == grouping.Key) - GetPaymentSum(paymentCredit => paymentCredit.Currency == grouping.Key))}")
                )) : Localizer.DoStr("nothing");
 
         [Tooltip(100)] public override LocString Description()
-            => Localizer.Do($"Owes {DebtSummary()}.\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribeWages()}");
+            => Localizer.Do($"Owes {DebtSummary()}.\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}");
 
         public LocString DescribeDebts()
         {
@@ -162,13 +162,13 @@ namespace Eco.Mods.SmartTax
             return new LocString(string.Join('\n', TaxRebates.OrderByDescending(taxRebate => taxRebate.Amount).Select(taxRebate => taxRebate.Description)));
         }
 
-        public LocString DescribeWages()
+        public LocString DescribePayments()
         {
-            if (WageCredits.Count == 0)
+            if (PaymentCredits.Count == 0)
             {
-                return Localizer.DoStr("No outstanding wages.");
+                return Localizer.DoStr("No outstanding payments.");
             }
-            return new LocString(string.Join('\n', WageCredits.OrderByDescending(wageCredit => wageCredit.Amount).Select(wageCredit => wageCredit.Description)));
+            return new LocString(string.Join('\n', PaymentCredits.OrderByDescending(paymentCredit => paymentCredit.Amount).Select(paymentCredit => paymentCredit.Description)));
         }
 
         public void Tick()
@@ -186,13 +186,13 @@ namespace Eco.Mods.SmartTax
                 TickDebtRebates(taxDebt);
             }
 
-            // Now iterate wages, smallest first, try to cancel out with taxes left after rebate, otherwise try to pay
-            var wages = WageCredits
-                .OrderBy(wageCredit => wageCredit.Amount)
+            // Now iterate payments, smallest first, try to cancel out with taxes left after rebate, otherwise try to pay
+            var payments = PaymentCredits
+                .OrderBy(paymentCredit => paymentCredit.Amount)
                 .ToArray();
-            foreach (var wageCredit in wages)
+            foreach (var paymentCredit in payments)
             {
-                TickWage(wageCredit, pack);
+                TickPayment(paymentCredit, pack);
             }
 
             // Now iterate debts again, smallest first, try to collect
@@ -229,7 +229,7 @@ namespace Eco.Mods.SmartTax
                 if (taxRebate.Amount >= taxDebt.Amount)
                 {
                     // The rebate covers the debt entirely
-                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.Description} used to fully forgive {taxDebt.Description}"));
+                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.Description} used to fully settle {taxDebt.Description}"));
                     taxRebate.Amount -= taxDebt.Amount;
                     taxDebt.Amount = 0.0f;
                     TaxDebts.Remove(taxDebt);
@@ -240,7 +240,7 @@ namespace Eco.Mods.SmartTax
                     return;
                 }
                 // The rebate covers the debt partially
-                TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.Description} used to partially forgive {taxDebt.Description}"));
+                TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.Description} used to partially settle {taxDebt.Description}"));
                 taxDebt.Amount -= taxRebate.Amount;
                 taxRebate.Amount = 0.0f;
                 TaxRebates.Remove(taxRebate);
@@ -253,64 +253,64 @@ namespace Eco.Mods.SmartTax
         }
 
         /// <summary>
-        /// Updates a wage credit, attempting to reduce or remove it entirely via debts, and attempting to pay the remainder.
+        /// Updates a payment credit, attempting to reduce or remove it entirely via debts, and attempting to pay the remainder.
         /// May generate transactions and/or tax events.
         /// </summary>
-        /// <param name="wageCredit"></param>
+        /// <param name="paymentCredit"></param>
         /// <param name="pack"></param>
-        private void TickWage(WageCredit wageCredit, GameActionPack pack)
+        private void TickPayment(PaymentCredit paymentCredit, GameActionPack pack)
         {
-            // Find any taxes that we can use the wage to pay off, smallest first
+            // Find any taxes that we can use the payment to pay off, smallest first
             var taxDebts = TaxDebts
-                .Where(taxDebt => taxDebt.TargetAccount == wageCredit.SourceAccount && taxDebt.Currency == wageCredit.Currency)
+                .Where(taxDebt => taxDebt.TargetAccount == paymentCredit.SourceAccount && taxDebt.Currency == paymentCredit.Currency)
                 .OrderBy(taxDebt => taxDebt.Amount)
                 .ToArray();
             foreach (var taxDebt in taxDebts)
             {
-                if (wageCredit.Amount >= taxDebt.Amount)
+                if (paymentCredit.Amount >= taxDebt.Amount)
                 {
-                    // The wage covers the debt entirely
-                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, wageCredit.WageCode, Localizer.Do($"{wageCredit.Description} used to fully settle {taxDebt.Description}"));
-                    wageCredit.Amount -= taxDebt.Amount;
+                    // The payment covers the debt entirely
+                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, paymentCredit.PaymentCode, Localizer.Do($"{paymentCredit.Description} used to fully settle {taxDebt.Description}"));
+                    paymentCredit.Amount -= taxDebt.Amount;
                     taxDebt.Amount = 0.0f;
                     TaxDebts.Remove(taxDebt);
-                    if (wageCredit.Amount < Transfers.AlmostZero)
+                    if (paymentCredit.Amount < Transfers.AlmostZero)
                     {
                         break;
                     }
                 }
                 else
                 {
-                    // The wage covers the debt partially
-                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, wageCredit.WageCode, Localizer.Do($"{wageCredit.Description} used to partially settle {taxDebt.Description}"));
-                    taxDebt.Amount -= wageCredit.Amount;
-                    wageCredit.Amount = 0.0f;
-                    WageCredits.Remove(wageCredit);
+                    // The payment covers the debt partially
+                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, paymentCredit.PaymentCode, Localizer.Do($"{paymentCredit.Description} used to partially settle {taxDebt.Description}"));
+                    taxDebt.Amount -= paymentCredit.Amount;
+                    paymentCredit.Amount = 0.0f;
+                    PaymentCredits.Remove(paymentCredit);
                     return;
                 }
             }
-            if (wageCredit.Amount < Transfers.AlmostZero)
+            if (paymentCredit.Amount < Transfers.AlmostZero)
             {
-                WageCredits.Remove(wageCredit);
+                PaymentCredits.Remove(paymentCredit);
                 return;
             }
 
             // Check how much money is available to pay them
-            var availableAmount = wageCredit.SourceAccount.GetCurrencyHoldingVal(wageCredit.Currency);
-            if (availableAmount >= wageCredit.Amount)
+            var availableAmount = paymentCredit.SourceAccount.GetCurrencyHoldingVal(paymentCredit.Currency);
+            if (availableAmount >= paymentCredit.Amount)
             {
                 // They can be fully paid
-                TaxLog.AddTaxEvent(wageCredit.SourceAccount, wageCredit.WageCode, Localizer.Do($"Fully paid {wageCredit.Description}"));
-                Transfers.Transfer(pack, CreateWageTransferData(Creator, wageCredit.SourceAccount, wageCredit.Currency, Localizer.NotLocalizedStr(wageCredit.WageCode), wageCredit.Amount));
-                wageCredit.Amount = 0.0f;
-                WageCredits.Remove(wageCredit);
+                TaxLog.AddTaxEvent(paymentCredit.SourceAccount, paymentCredit.PaymentCode, Localizer.Do($"Fully paid {paymentCredit.Description}"));
+                Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
+                paymentCredit.Amount = 0.0f;
+                PaymentCredits.Remove(paymentCredit);
             }
             else if (availableAmount > Transfers.AlmostZero)
             {
                 // They can be partially paid
-                TaxLog.AddTaxEvent(wageCredit.SourceAccount, wageCredit.WageCode, Localizer.Do($"Partially paid {wageCredit.Description}"));
-                Transfers.Transfer(pack, CreateWageTransferData(Creator, wageCredit.SourceAccount, wageCredit.Currency, Localizer.NotLocalizedStr(wageCredit.WageCode), availableAmount));
-                wageCredit.Amount -= availableAmount;
+                TaxLog.AddTaxEvent(paymentCredit.SourceAccount, paymentCredit.PaymentCode, Localizer.Do($"Partially paid {paymentCredit.Description}"));
+                Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
+                paymentCredit.Amount -= availableAmount;
             }
         }
 
@@ -374,16 +374,16 @@ namespace Eco.Mods.SmartTax
         };
 
         /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
-        private TransferData CreateWageTransferData(User wageReceiver, BankAccount sourceAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
+        private TransferData CreatePaymentTransferData(User paymentReceiver, BankAccount sourceAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
         {
-            Receiver = wageReceiver,
+            Receiver = paymentReceiver,
             TaxableAmount = 0.0f,
             Amount = amount,
             SourceAccount = sourceAccount,
-            TargetAccount = wageReceiver.BankAccount,
+            TargetAccount = paymentReceiver.BankAccount,
             TaxDestination = null,
             TaxRate = 0.0f,
-            ServerMessageToAll = DefaultChatTags.Wages,
+            ServerMessageToAll = DefaultChatTags.Finance,
 
             // Shared defaults (always the same).
             Currency = currency,

@@ -21,13 +21,13 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
 
-    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), LocDescription("A smarter wage that tracks credit if the source account can't afford it.")]
+    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), LocDescription("A smarter payment that tracks credit if the payer can't afford it.")]
     public class SmartPay_LegalAction : LegalAction, IExecutiveAction, ICustomValidity
     {
         [Eco, LocDescription("Where the money comes from. Only Government Accounts are allowed."), GovernmentAccountsOnly]
         public GameValue<BankAccount> SourceBankAccount { get; set; } = Make.Treasury;
 
-        [Eco, Advanced, LocDescription("Which currency to pay the wage in.")]
+        [Eco, Advanced, LocDescription("The currency that is going to be paid in.")]
         public GameValue<Currency> Currency { get; set; }
 
         [Eco, LocDescription("The amount that is going to be paid.")]
@@ -36,14 +36,14 @@ namespace Eco.Mods.SmartTax
         [Eco, Advanced, LocDescription("The player or group to pay.")]
         public GameValue<IAlias> Target { get; set; }
 
-        [Eco, LocDescription("A custom name for the wage. If left blank, the name of the law will be used instead."), AllowNull]
-        public string WageCode { get; set; }
+        [Eco, LocDescription("A custom name for the payment. If left blank, the name of the law will be used instead."), AllowNull]
+        public string PaymentCode { get; set; }
 
-        [Eco, LocDescription("If ticked, no notification will be published at all when the wage is applied. Will still notify when the wage is paid. Useful for high-frequency events like placing blocks or emitting pollution.")]
+        [Eco, LocDescription("If true, no notification will be published at all when the payment is applied. Will still notify when the actual transaction occurs. Useful for high-frequency events like placing blocks or emitting pollution.")]
         public GameValue<bool> Silent { get; set; } = new No();
 
         public override LocString Description()
-            => Localizer.Do($"Smart pay wage of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.SourceBankAccount.DescribeNullSafe()} to {this.Target.DescribeNullSafe()}.");
+            => Localizer.Do($"Smart pay {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.SourceBankAccount.DescribeNullSafe()} to {this.Target.DescribeNullSafe()}.");
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
         PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
@@ -54,7 +54,7 @@ namespace Eco.Mods.SmartTax
             var currency = this.Currency?.Value(context).Val;
             var amount = this.Amount?.Value(context).Val ?? 0.0f;
             var alias = this.Target?.Value(context).Val;
-            var wageCode = string.IsNullOrEmpty(this.WageCode) ? description : this.WageCode;
+            var paymentCode = string.IsNullOrEmpty(this.PaymentCode) ? description : this.PaymentCode;
             var silent = this.Silent?.Value(context).Val ?? false;
 
             if (sourceBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
@@ -64,7 +64,7 @@ namespace Eco.Mods.SmartTax
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordWage(sourceBankAccount, currency, wageCode, amount);
+                taxCard.RecordPayment(sourceBankAccount, currency, paymentCode, amount);
             }
 
             if (silent)
@@ -73,7 +73,7 @@ namespace Eco.Mods.SmartTax
             }
             else
             {
-                return new PostResult($"Issuing wage of {currency.UILinkContent(amount)} from {sourceBankAccount.UILink()} to {alias.UILinkGeneric()} ({wageCode})", true);
+                return new PostResult($"Issuing payment of {currency.UILinkContent(amount)} from {sourceBankAccount.UILink()} to {alias.UILinkGeneric()} ({paymentCode})", true);
             }
         }
     }

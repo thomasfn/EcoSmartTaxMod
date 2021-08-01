@@ -15,12 +15,12 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
 
-    [Eco, LocCategory("Citizens"), LocDescription("How much a citizen is owed in wages from a particular Government Account.")]
-    public class OwedWages : GameValue<float>
+    [Eco, LocCategory("Citizens"), LocDescription("How much in payment a citizen is owed from a particular Government Account.")]
+    public class OwedPayments : GameValue<float>
     {
         [Eco, Advanced, LocDescription("The currency owed to the citizen to count.")] public GameValue<Currency> Currency { get; set; }
-        [Eco, Advanced, LocDescription("The citizen whose owed wages are being calculated.")] public GameValue<User> Citizen { get; set; }
-        [Eco, Advanced, LocDescription("The Government Account from which the wages are paid."), GovernmentAccountsOnly] public GameValue<BankAccount> SourceAccount { get; set; }
+        [Eco, Advanced, LocDescription("The citizen whose owed payment are being calculated.")] public GameValue<User> Citizen { get; set; }
+        [Eco, Advanced, LocDescription("The Government Account from which the payments are made."), GovernmentAccountsOnly] public GameValue<BankAccount> SourceAccount { get; set; }
 
         private Eval<float> FailNullSafeFloat<T>(Eval<T> eval, string paramName) =>
             eval != null ? Eval.Make($"Invalid {Localizer.DoStr(paramName)} specified on {GetType().GetLocDisplayName()}: {eval.Message}", float.MinValue)
@@ -33,9 +33,9 @@ namespace Eco.Mods.SmartTax
             var sourceAccount = this.SourceAccount?.Value(action); if (sourceAccount?.Val == null) return this.FailNullSafeFloat(sourceAccount, nameof(this.SourceAccount));
 
             var taxCard = TaxCard.GetOrCreateForUser(user.Val);
-            float owed = taxCard.GetWageSum(wageCredit => wageCredit.Currency == cur.Val && wageCredit.SourceAccount == sourceAccount.Val);
-            return Eval.Make($"{Text.StyledNum(owed)} ({user?.Val.UILink()}'s owed wages in {cur.Val.UILink()} from {sourceAccount.Val.UILink()})", owed);
+            float owed = taxCard.GetPaymentSum(paymentCredit => paymentCredit.Currency == cur.Val && paymentCredit.SourceAccount == sourceAccount.Val);
+            return Eval.Make($"{Text.StyledNum(owed)} ({user?.Val.UILink()}'s owed payment in {cur.Val.UILink()} from {sourceAccount.Val.UILink()})", owed);
         }
-        public override LocString Description() => Localizer.Do($"wages owed to {this.Citizen.DescribeNullSafe()} in {this.Currency.DescribeNullSafe()} from {this.SourceAccount.DescribeNullSafe()}");
+        public override LocString Description() => Localizer.Do($"payment owed to {this.Citizen.DescribeNullSafe()} in {this.Currency.DescribeNullSafe()} from {this.SourceAccount.DescribeNullSafe()}");
     }
 }
