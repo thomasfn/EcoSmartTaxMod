@@ -135,11 +135,11 @@ namespace Eco.Mods.SmartTax
                 .Sum();
 
         public LocString DebtSummary()
-            => Localizer.DoStr(string.Join(", ",
+            => TaxDebts.Any() ? Localizer.DoStr(string.Join(", ",
                  TaxDebts
                     .GroupBy(taxDebt => taxDebt.Currency)
                     .Select(grouping => $"{grouping.Key.UILink(GetDebtSum(taxDebt => taxDebt.Currency == grouping.Key) - GetRebateSum(taxRebate => taxRebate.Currency == grouping.Key) - GetWageSum(wageCredit => wageCredit.Currency == grouping.Key))}")
-               ));
+               )) : Localizer.DoStr("nothing");
 
         [Tooltip(100)] public override LocString Description()
             => Localizer.Do($"Owes {DebtSummary()}.\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribeWages()}");
