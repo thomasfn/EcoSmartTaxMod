@@ -90,6 +90,7 @@ namespace Eco.Mods.SmartTax
                 () => new TaxDebt { TargetAccount = targetAccount, Currency = currency, TaxCode = taxCode, Amount = 0.0f }
             );
             taxEntry.Amount += amount;
+            TaxLog.AddTaxEvent(new RecordTaxEvent(targetAccount, taxCode, amount, currency));
         }
 
         public void RecordPayment(BankAccount sourceAccount, Currency currency, string paymentCode, float amount)
@@ -100,6 +101,7 @@ namespace Eco.Mods.SmartTax
                 () => new PaymentCredit { SourceAccount = sourceAccount, Currency = currency, PaymentCode = paymentCode, Amount = 0.0f }
             );
             paymentCredit.Amount += amount;
+            TaxLog.AddTaxEvent(new RecordPaymentEvent(sourceAccount, paymentCode, amount, currency));
         }
 
         public void RecordRebate(BankAccount targetAccount, Currency currency, string rebateCode, float amount)
@@ -108,8 +110,9 @@ namespace Eco.Mods.SmartTax
             var taxRebate = TaxRebates.GetOrCreate(
                taxRebate => taxRebate.TargetAccount == targetAccount && taxRebate.Currency == currency && taxRebate.RebateCode == rebateCode,
                () => new TaxRebate { TargetAccount = targetAccount, Currency = currency, RebateCode = rebateCode, Amount = 0.0f }
-           );
+            );
             taxRebate.Amount += amount;
+            TaxLog.AddTaxEvent(new RecordRebateEvent(targetAccount, rebateCode, amount, currency));
         }
 
         public override void OnLinkClicked(TooltipContext context) => context.Player.OpenInfoPanel(Localizer.Do($"Log for {this.UILink()}"), this.TaxLog.RenderToText(), "BankTransactions");
@@ -228,8 +231,8 @@ namespace Eco.Mods.SmartTax
             {
                 if (taxRebate.Amount >= taxDebt.Amount)
                 {
-                    // The rebate covers the debt entirely
-                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.Description} used to fully settle {taxDebt.Description}"));
+                    // The rebate covers the debt fully
+                    TaxLog.AddTaxEvent(new SettlementEvent(taxRebate, false, taxDebt));
                     taxRebate.Amount -= taxDebt.Amount;
                     taxDebt.Amount = 0.0f;
                     TaxDebts.Remove(taxDebt);
@@ -240,7 +243,7 @@ namespace Eco.Mods.SmartTax
                     return;
                 }
                 // The rebate covers the debt partially
-                TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.Description} used to partially settle {taxDebt.Description}"));
+                TaxLog.AddTaxEvent(new SettlementEvent(taxRebate, true, taxDebt));
                 taxDebt.Amount -= taxRebate.Amount;
                 taxRebate.Amount = 0.0f;
                 TaxRebates.Remove(taxRebate);
@@ -269,8 +272,8 @@ namespace Eco.Mods.SmartTax
             {
                 if (paymentCredit.Amount >= taxDebt.Amount)
                 {
-                    // The payment covers the debt entirely
-                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, paymentCredit.PaymentCode, Localizer.Do($"{paymentCredit.Description} used to fully settle {taxDebt.Description}"));
+                    // The payment covers the debt fully
+                    TaxLog.AddTaxEvent(new SettlementEvent(paymentCredit, false, taxDebt));
                     paymentCredit.Amount -= taxDebt.Amount;
                     taxDebt.Amount = 0.0f;
                     TaxDebts.Remove(taxDebt);
@@ -282,7 +285,7 @@ namespace Eco.Mods.SmartTax
                 else
                 {
                     // The payment covers the debt partially
-                    TaxLog.AddTaxEvent(taxDebt.TargetAccount, paymentCredit.PaymentCode, Localizer.Do($"{paymentCredit.Description} used to partially settle {taxDebt.Description}"));
+                    TaxLog.AddTaxEvent(new SettlementEvent(paymentCredit, true, taxDebt));
                     taxDebt.Amount -= paymentCredit.Amount;
                     paymentCredit.Amount = 0.0f;
                     PaymentCredits.Remove(paymentCredit);
@@ -300,7 +303,7 @@ namespace Eco.Mods.SmartTax
             if (availableAmount >= paymentCredit.Amount)
             {
                 // They can be fully paid
-                TaxLog.AddTaxEvent(paymentCredit.SourceAccount, paymentCredit.PaymentCode, Localizer.Do($"Fully paid {paymentCredit.Description}"));
+                TaxLog.AddTaxEvent(new PaymentEvent(paymentCredit.Amount, paymentCredit));
                 Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
                 paymentCredit.Amount = 0.0f;
                 PaymentCredits.Remove(paymentCredit);
@@ -308,7 +311,7 @@ namespace Eco.Mods.SmartTax
             else if (availableAmount > Transfers.AlmostZero)
             {
                 // They can be partially paid
-                TaxLog.AddTaxEvent(paymentCredit.SourceAccount, paymentCredit.PaymentCode, Localizer.Do($"Partially paid {paymentCredit.Description}"));
+                TaxLog.AddTaxEvent(new PaymentEvent(availableAmount, paymentCredit));
                 Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
                 paymentCredit.Amount -= availableAmount;
             }
@@ -335,16 +338,16 @@ namespace Eco.Mods.SmartTax
             }
             if (total >= taxDebt.Amount)
             {
-                // Their balance covers the debt entirely
-                TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"Fully collected {taxDebt.Description}"));
+                // Their balance covers the debt fully
+                TaxLog.AddTaxEvent(new CollectionEvent(taxDebt.Amount, taxDebt));
                 Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), taxDebt.Amount));
                 taxDebt.Amount = 0.0f;
                 TaxDebts.Remove(taxDebt);
             }
             else if (total > Transfers.AlmostZero)
             {
-                // Their balance covers the debt entirely
-                TaxLog.AddTaxEvent(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"Collected {taxDebt.Currency.UILink(total)} for {taxDebt.Description}"));
+                // Their balance covers the debt partially
+                TaxLog.AddTaxEvent(new CollectionEvent(total, taxDebt));
                 Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), total));
                 taxDebt.Amount -= total;
             }
