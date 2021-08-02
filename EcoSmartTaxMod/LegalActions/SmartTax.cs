@@ -39,11 +39,11 @@ namespace Eco.Mods.SmartTax
         [Eco, LocDescription("A custom name for the tax. If left blank, the name of the law will be used instead."), AllowNull]
         public string TaxCode { get; set; }
 
-        [Eco, LocDescription("If ticked, no notification will be published at all when the tax is applied. Will still notify when the tax is collected. Useful for high-frequency events like placing blocks or emitting pollution.")]
+        [Eco, LocDescription("If true, no notification will be published at all when the tax is applied. Will still notify when the tax is collected. Useful for high-frequency events like placing blocks or emitting pollution.")]
         public GameValue<bool> Silent { get; set; } = new No();
 
         public override LocString Description()
-            => Localizer.Do($"Smart collect tax of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
+            => Localizer.Do($"Issue tax of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
         PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;

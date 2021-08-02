@@ -39,11 +39,11 @@ namespace Eco.Mods.SmartTax
         [Eco, LocDescription("A custom name for the rebate. If left blank, the name of the law will be used instead."), AllowNull]
         public string RebateCode { get; set; }
 
-        [Eco, LocDescription("If ticked, no notification will be published at all when the rebate is applied. Will still notify when the tax is collected. Useful for high-frequency events like placing blocks or emitting pollution.")]
-        public bool Silent { get; set; } = false;
+        [Eco, LocDescription("If true, no notification will be published at all when the rebate is applied. Will still notify when the tax is collected. Useful for high-frequency events like placing blocks or emitting pollution.")]
+        public GameValue<bool> Silent { get; set; } = new No();
 
         public override LocString Description()
-            => Localizer.Do($"Smart collect tax of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
+            => Localizer.Do($"Issue rebate of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
         PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
@@ -55,6 +55,7 @@ namespace Eco.Mods.SmartTax
             var amount = this.Amount?.Value(context).Val ?? 0.0f;
             var alias = this.Target?.Value(context).Val;
             var rebateCode = string.IsNullOrEmpty(this.RebateCode) ? description : this.RebateCode;
+            var silent = this.Silent?.Value(context).Val ?? false;
 
             if (targetBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
 
@@ -66,7 +67,7 @@ namespace Eco.Mods.SmartTax
                 taxCard.RecordRebate(targetBankAccount, currency, rebateCode, amount);
             }
 
-            if (Silent)
+            if (silent)
             {
                 return PostResult.Succeeded;
             }
