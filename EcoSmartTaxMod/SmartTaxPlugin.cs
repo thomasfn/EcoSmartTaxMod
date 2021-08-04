@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 
 namespace Eco.Mods.SmartTax
 {
@@ -77,7 +78,7 @@ namespace Eco.Mods.SmartTax
         public string GetStatus() => string.Empty;
         public override string ToString() => Localizer.DoStr("SmartTax");
         public void Run() => this.tickWorker.Start(ThreadPriorityTaskFactory.Lowest);
-        public void Shutdown() => this.tickWorker.Shutdown();
+        public Task ShutdownAsync() => this.tickWorker.ShutdownAsync();
         public void SaveAll() => StorageManager.Obj.MarkDirty(data);
 
         public object GetEditObject() => Config;

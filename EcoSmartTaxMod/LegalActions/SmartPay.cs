@@ -24,7 +24,7 @@ namespace Eco.Mods.SmartTax
     [Eco, LocCategory("Finance"), CreateComponentTab("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), LocDescription("A smarter payment that tracks credit if the payer can't afford it.")]
     public class SmartPay_LegalAction : LegalAction, IExecutiveAction, ICustomValidity
     {
-        [Eco, LocDescription("Where the money comes from. Only Government Accounts are allowed."), GovernmentAccountsOnly]
+        [Eco, LocDescription("Where the money comes from. Only Government Accounts are allowed."), TaxDestinationsOnly]
         public GameValue<BankAccount> SourceBankAccount { get; set; } = Make.Treasury;
 
         [Eco, Advanced, LocDescription("The currency that is going to be paid in.")]

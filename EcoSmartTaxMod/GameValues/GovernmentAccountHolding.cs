@@ -18,7 +18,7 @@ namespace Eco.Mods.SmartTax
     public class GovernmentAccountHolding : GameValue<float>
     {
         [Eco, Advanced, LocDescription("The currency held by the bank account to count.")] public GameValue<Currency> Currency { get; set; }
-        [Eco, Advanced, LocDescription("The bank account whose amount is being calculated.")] public GameValue<GovernmentBankAccount> Account { get; set; }
+        [Eco, Advanced, LocDescription("The bank account whose amount is being calculated."), TaxDestinationsOnly] public GameValue<BankAccount> Account { get; set; }
 
         public override Eval<float> Value(IContextObject action)
         {
@@ -30,6 +30,6 @@ namespace Eco.Mods.SmartTax
 
             return Eval.Make($"{Text.StyledNum(amount)} ({account?.Val.UILink()}'s amount in {cur.Val.UILink()})", amount);
         }
-        public override LocString Description() => Localizer.Do($"amount of {this.Account.DescribeNullSafe()} in {this.Currency.DescribeNullSafe()}");
+        public override LocString Description() => Localizer.Do($"amount of {this.Currency.DescribeNullSafe()} in {this.Account.DescribeNullSafe()}");
     }
 }

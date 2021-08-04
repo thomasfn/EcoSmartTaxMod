@@ -20,7 +20,7 @@ namespace Eco.Mods.SmartTax
     {
         [Eco, Advanced, LocDescription("The currency owed by the citizen to count.")] public GameValue<Currency> Currency { get; set; }
         [Eco, Advanced, LocDescription("The citizen whose tax debt is being calculated.")] public GameValue<User> Citizen { get; set; }
-        [Eco, Advanced, LocDescription("The Government Account to which the tax debt is owed."), GovernmentAccountsOnly] public GameValue<BankAccount> TargetAccount { get; set; }
+        [Eco, Advanced, LocDescription("The Government Account to which the tax debt is owed."), TaxDestinationsOnly] public GameValue<BankAccount> TargetAccount { get; set; }
         [Eco, Advanced, LocDescription("Whether to consider any rebates the citizen has been issued. This may cause a negative number to be returned.")] public GameValue<bool> ConsiderRebates { get; set; } = new Yes();
 
         private Eval<float> FailNullSafeFloat<T>(Eval<T> eval, string paramName) =>

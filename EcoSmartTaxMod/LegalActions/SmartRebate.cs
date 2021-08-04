@@ -24,7 +24,7 @@ namespace Eco.Mods.SmartTax
     [Eco, LocCategory("Finance"), CreateComponentTab("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Rebate"), LocDescription("Issues a rebate which is used to forgive some amount of future or present tax debt.")]
     public class SmartRebate_LegalAction : LegalAction, IExecutiveAction, ICustomValidity
     {
-        [Eco, LocDescription("Rebates taxes towards this account. Only Government Accounts are allowed."), GovernmentAccountsOnly]
+        [Eco, LocDescription("Rebates taxes towards this account. Only Government Accounts are allowed."), TaxDestinationsOnly]
         public GameValue<BankAccount> TargetBankAccount { get; set; } = Make.Treasury;
 
         [Eco, Advanced, LocDescription("Which currency the rebate is for.")]
