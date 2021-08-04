@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 
 namespace Eco.Mods.SmartTax
 {
     using Core.Plugins.Interfaces;
     using Core.Utils;
+    using Core.Utils.Threading;
     using Core.Systems;
     using Core.Serialization;
     using Core.Plugins;
@@ -18,12 +20,16 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.Chat;
     using Gameplay.Systems.TextLinks;
 
+    using Simulation.Time;
+
     [Serialized]
     public class SmartTaxData : Singleton<SmartTaxData>, IStorage
     {
         public IPersistent StorageHandle { get; set; }
 
         [Serialized] public Registrar TaxCards = new Registrar();
+
+        public readonly PeriodicUpdateConfig UpdateTimer = new PeriodicUpdateConfig(true);
 
         public void InitializeRegistrars()
         {
@@ -32,8 +38,10 @@ namespace Eco.Mods.SmartTax
 
         public void Initialize()
         {
-            
+            this.UpdateTimer.Initialize(SmartTaxPlugin.Obj, () => SmartTaxPlugin.Obj.Config.TickInterval);
         }
+
+        public void QueueUpTaxTick() => this.UpdateTimer.SetToTriggerNextTick();
     }
 
     [Localized]
@@ -41,12 +49,16 @@ namespace Eco.Mods.SmartTax
     {
         [LocDescription("Seconds between each tax tick.")]
         public int TickInterval { get; set; } = 300;
+
+        [LocDescription("Seconds before a tax event can no longer be combined with a like one.")]
+        public int AggregateTaxEventThreshold { get; set; } = 30;
     }
 
     [Localized, LocDisplayName(nameof(SmartTaxPlugin)), Priority(PriorityAttribute.High)]
-    public class SmartTaxPlugin : Singleton<SmartTaxPlugin>, IModKitPlugin, IInitializablePlugin, IChatCommandHandler, ISaveablePlugin, IContainsRegistrars, IConfigurablePlugin
+    public class SmartTaxPlugin : Singleton<SmartTaxPlugin>, IModKitPlugin, IInitializablePlugin, IThreadedPlugin, IChatCommandHandler, ISaveablePlugin, IContainsRegistrars, IConfigurablePlugin
     {
         [NotNull] private readonly SmartTaxData data;
+        [NotNull] private readonly RepeatableActionWorker tickWorker;
 
         public IPluginConfig PluginConfig => config;
 
@@ -57,6 +69,7 @@ namespace Eco.Mods.SmartTax
         {
             data = StorageManager.LoadOrCreate<SmartTaxData>("SmartTax");
             config = new PluginConfig<SmartTaxConfig>("SmartTax");
+            this.tickWorker = PeriodicWorkerFactory.Create(TimeSpan.FromSeconds(Config.TickInterval), this.TryTickAll);
         }
 
         public void Initialize(TimedTask timer) => data.Initialize();
@@ -64,6 +77,8 @@ namespace Eco.Mods.SmartTax
         public string GetDisplayText() => string.Empty;
         public string GetStatus() => string.Empty;
         public override string ToString() => Localizer.DoStr("SmartTax");
+        public void Run() => this.tickWorker.Start(ThreadPriorityTaskFactory.Lowest);
+        public Task ShutdownAsync() => this.tickWorker.ShutdownAsync();
         public void SaveAll() => StorageManager.Obj.MarkDirty(data);
 
         public object GetEditObject() => Config;
@@ -72,6 +87,12 @@ namespace Eco.Mods.SmartTax
         public void OnEditObjectChanged(object o, string param)
         {
             this.SaveConfig();
+        }
+
+        private void TryTickAll()
+        {
+            if (!this.data.UpdateTimer.DoUpdate) { return; }
+            TickAll();
         }
 
         public void TickAll()
@@ -85,22 +106,20 @@ namespace Eco.Mods.SmartTax
 
         #region Chat Commands
 
-        [ChatCommand("SmartTax", ChatAuthorizationLevel.User)]
-        public static void SmartTax() { }
+        [ChatCommand("Tax", ChatAuthorizationLevel.User)]
+        public static void Tax() { }
 
-        [ChatSubCommand("SmartTax", "Retrieves the player's tax card.", ChatAuthorizationLevel.User)]
-        public static void MyCard(User user)
+        [ChatSubCommand("Tax", "Retrieves the player's tax card.", ChatAuthorizationLevel.User)]
+        public static void Card(User user)
         {
             var taxCard = TaxCard.GetOrCreateForUser(user);
-            user.MsgLoc($"{taxCard.UILink()}");
+            user.MsgLoc($"{taxCard.UILink()} owes {taxCard.DebtSummary()}");
         }
 
-        [ChatSubCommand("SmartTax", "Performs a tax tick immediately.", ChatAuthorizationLevel.Admin)]
+        [ChatSubCommand("Tax", "Performs a tax tick immediately.", ChatAuthorizationLevel.Admin)]
         public static void TickNow(User user)
         {
-            user.MsgLoc($"Running full tax tick...");
-            Obj.TickAll();
-            user.MsgLoc($"Tax tick done.");
+            Obj.data.QueueUpTaxTick();
         }
 
         #endregion
