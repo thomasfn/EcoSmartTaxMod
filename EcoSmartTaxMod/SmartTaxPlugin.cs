@@ -41,6 +41,9 @@ namespace Eco.Mods.SmartTax
     {
         [LocDescription("Seconds between each tax tick.")]
         public int TickInterval { get; set; } = 300;
+
+        [LocDescription("Seconds before a tax event can no longer be combined with a like one.")]
+        public int AggregateTaxEventThreshold { get; set; } = 30;
     }
 
     [Localized, LocDisplayName(nameof(SmartTaxPlugin)), Priority(PriorityAttribute.High)]

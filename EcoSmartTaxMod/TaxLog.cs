@@ -179,6 +179,14 @@ namespace Eco.Mods.SmartTax
 
         private bool TryAggregateEvents(TaxEvent lastEvent, TaxEvent newEvent, out TaxEvent aggregatedEvent)
         {
+            // Suppress aggregation if the difference in timestamp is large enough (e.g. don't combine an event with one from 10h ago)
+            if (newEvent.Time - lastEvent.Time > SmartTaxPlugin.Obj.Config.AggregateTaxEventThreshold)
+            {
+                aggregatedEvent = null;
+                return false;
+            }
+
+            // Combine like events
             if (lastEvent is RecordTaxEvent previousRecordTaxEvent && newEvent is RecordTaxEvent latestRecordTaxEvent && previousRecordTaxEvent.CanBeAggregatedWith(latestRecordTaxEvent))
             {
                 aggregatedEvent = new RecordTaxEvent(previousRecordTaxEvent, latestRecordTaxEvent.Amount);
@@ -194,6 +202,8 @@ namespace Eco.Mods.SmartTax
                 aggregatedEvent = new RecordPaymentEvent(previousRecordPaymentEvent, latestRecordPaymentEvent.Amount);
                 return true;
             }
+
+            // Nothing to combine
             aggregatedEvent = null;
             return false;
         }
