@@ -397,10 +397,10 @@ namespace Eco.Mods.SmartTax
             Currency = currency,
             TransferDescription = transactionDescription,
             TransferAsMuchAsPossible = true, // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
-            SuppressGameActions = true,                         // To prevent infinite loops (e.g. "if tax then tax").
+            SuppressGameActions = false,                         // To prevent infinite loops (e.g. "if tax then tax").
             UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
             SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
-            IsFundsAllocation = true,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
+            IsFundsAllocation = false,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
             Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
         };
 
@@ -420,7 +420,7 @@ namespace Eco.Mods.SmartTax
             Currency = currency,
             TransferDescription = transactionDescription,
             TransferAsMuchAsPossible = true,  // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
-            SuppressGameActions = true,                         // To prevent infinite loops (e.g. "if tax then tax").
+            SuppressGameActions = false,                         // To prevent infinite loops (e.g. "if tax then tax").
             UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
             SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
             IsFundsAllocation = true,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
