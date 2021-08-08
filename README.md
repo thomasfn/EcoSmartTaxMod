@@ -24,7 +24,7 @@ Clicking on the link will open the tax log. This shows the last 100 tax events i
 ![Tax Card Tax Log Simple](./screenshots/taxcard-log-simple.png "Tax Card Tax Log Simple")
 
 ### Smart Tax
-A tax can be issued to a player using the Smart Tax legal action from a law or executive action. This is used in a very similar manner to the vanilla Tax legal action. The Smart Tax can be found in the Finance section along with the other currency related legal actions. The important distiniction is that the Smart Tax will not collect any currency right away, instead it will try to collect on the next tax tick, which by default runs every 5 minutes. This is to avoid spamming the bank account transaction logs.
+A tax can be issued to a player using the Smart Tax legal action from a law or executive action. This is used in a very similar manner to the vanilla Tax legal action. The Smart Tax can be found in the Finance section along with the other currency related legal actions. The important distiniction is that the Smart Tax will not collect any currency right away, instead it will try to collect on the next tax tick, which by default runs every 5 minutes. This is to avoid spamming the bank account transaction logs. Successful tax collections will trigger the "Pay Tax" law trigger.
 
 ![Legal Action Dropdown](./screenshots/legalaction-dropdown.png "Legal Action Dropdown")
 
@@ -37,6 +37,7 @@ The Smart Tax legal action has the following properties:
 | Amount | Number | The amount to collect. This can be a fixed number or any regular Eco expression, e.g. a function of wealth or context. |
 | Target | Citizen/Title/Demographic | Who to apply the tax to. If this refers to multiple citizens, e.g. via a title or demographic, each citizen will be taxed the full amount. |
 | Tax Code | _String_ | An optional name for the tax. This helps distinguish it from other taxes on the tax card and in the tax log. By default, the name of the law or executive action will be used. |
+| Suspended | Boolean | Whether the tax should be suspended. A suspended tax will not be collected until another non-suspended tax is issued to the citizen with the same target bank account and currency (but not necessarily the same tax code). Suspended taxes will still show on the tax card and may still be relieved by rebates or payments. |
 | Silent | Boolean | Whether any notifications for the tax should be suppressed. Defaults to "No". This is helpful to set when applying a tax on a high frequency event, for example, the pollute air or the block placement law trigger. Silent taxes will still show on the tax card, in the tax log and will still make a notification when they're actually collected. |
 | Infobox On Success | Boolean | This is built into all Eco's legal actions. For this particular one, it is not very useful, as Silent does the same thing. |
 
@@ -88,7 +89,7 @@ Following collection, the citizen's tax log might look as follows:
 As you can see, the events in the tax log are clearly describing the calculations of how the tax rebates and debts are combined and collected.
 
 ### Smart Payment
-A payment can be issued to a player using the Smart Payment legal action from a law or executive action. This is used in a very similar manner to the vanilla Pay legal action. The Smart Pay can be found in the Finance section along with the other currency related legal actions. As with the Smart Tax, the important distiniction is that the Smart Pay will not pay any currency right away, instead attempting to pay on the next tax tick, to avoid spamming the bank account transaction logs. Payments are also used like rebates to relieve any tax debt before actually transferring currency.
+A payment can be issued to a player using the Smart Payment legal action from a law or executive action. This is used in a very similar manner to the vanilla Pay legal action. The Smart Pay can be found in the Finance section along with the other currency related legal actions. As with the Smart Tax, the important distiniction is that the Smart Pay will not pay any currency right away, instead attempting to pay on the next tax tick, to avoid spamming the bank account transaction logs. Payments are also used like rebates to relieve any tax debt before actually transferring currency. Successful payments will trigger the "Received Government Funds" law trigger.
 
 The Smart Payment legal action has the following properties:
 
