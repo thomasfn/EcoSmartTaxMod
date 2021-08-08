@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
@@ -69,7 +68,7 @@ namespace Eco.Mods.SmartTax
         {
             data = StorageManager.LoadOrCreate<SmartTaxData>("SmartTax");
             config = new PluginConfig<SmartTaxConfig>("SmartTax");
-            this.tickWorker = PeriodicWorkerFactory.Create(TimeSpan.FromSeconds(Config.TickInterval), this.TryTickAll);
+            this.tickWorker = PeriodicWorkerFactory.Create(TimeSpan.FromSeconds(1), this.TryTickAll);
         }
 
         public void Initialize(TimedTask timer) => data.Initialize();
@@ -97,11 +96,18 @@ namespace Eco.Mods.SmartTax
 
         public void TickAll()
         {
-            foreach (var taxCard in data.TaxCards.All().Cast<TaxCard>())
+            try
             {
-                taxCard.Tick();
+                foreach (var taxCard in data.TaxCards.All<TaxCard>())
+                {
+                    taxCard.Tick();
+                }
+                SaveAll();
             }
-            SaveAll();
+            catch (Exception ex)
+            {
+                Logger.Error($"Error while running tax tick: {ex}");
+            }
         }
 
         #region Chat Commands
@@ -113,13 +119,20 @@ namespace Eco.Mods.SmartTax
         public static void Card(User user)
         {
             var taxCard = TaxCard.GetOrCreateForUser(user);
-            user.MsgLoc($"{taxCard.UILink()} owes {taxCard.DebtSummary()}");
+            user.MsgLoc($"{taxCard.UILink()} owes {taxCard.DebtSummary()}, due {taxCard.CreditSummary()}");
+        }
+
+        [ChatSubCommand("Tax", "Show time until the next tax tick.", ChatAuthorizationLevel.User)]
+        public static void ShowTick(User user)
+        {
+            user.Msg(SmartTaxData.Obj.UpdateTimer.Describe());
         }
 
         [ChatSubCommand("Tax", "Performs a tax tick immediately.", ChatAuthorizationLevel.Admin)]
         public static void TickNow(User user)
         {
-            Obj.data.QueueUpTaxTick();
+            SmartTaxData.Obj.UpdateTimer.SetToTriggerNextTick();
+            user.MsgLocStr("Tax tick triggered.");
         }
 
         #endregion
