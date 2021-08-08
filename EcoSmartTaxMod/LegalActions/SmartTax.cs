@@ -39,11 +39,18 @@ namespace Eco.Mods.SmartTax
         [Eco, LocDescription("A custom name for the tax. If left blank, the name of the law will be used instead."), AllowNull]
         public string TaxCode { get; set; }
 
+        [Eco, LocDescription("If true, the tax will not be collected until it is activated, which happens when another non-suspended tax is issued to the same target account and currency.")]
+        public GameValue<bool> Suspended { get; set; } = new No();
+
         [Eco, LocDescription("If true, no notification will be published at all when the tax is applied. Will still notify when the tax is collected. Useful for high-frequency events like placing blocks or emitting pollution.")]
         public GameValue<bool> Silent { get; set; } = new No();
 
         public override LocString Description()
-            => Localizer.Do($"Issue tax of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
+            => Localizer.Do($"Issue {(Suspended is Yes ? "suspended " : "")}tax of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}{(Suspended is not No && Suspended is not Yes ? $", {DescribeSuspended()}" : "")}.");
+
+        private string DescribeSuspended()
+            => $"suspended when {this.Suspended.DescribeNullSafe()}";
+
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
         PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
@@ -55,6 +62,7 @@ namespace Eco.Mods.SmartTax
             var amount = this.Amount?.Value(context).Val ?? 0.0f;
             var alias = this.Target?.Value(context).Val;
             var taxCode = string.IsNullOrEmpty(this.TaxCode) ? description : this.TaxCode;
+            var suspended = this.Suspended?.Value(context).Val ?? false;
             var silent = this.Silent?.Value(context).Val ?? false;
 
             if (targetBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
@@ -64,7 +72,7 @@ namespace Eco.Mods.SmartTax
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordTax(targetBankAccount, currency, taxCode, amount);
+                taxCard.RecordTax(targetBankAccount, currency, taxCode, amount, suspended);
             }
 
             if (silent)
@@ -73,7 +81,7 @@ namespace Eco.Mods.SmartTax
             }
             else
             {
-                return new PostResult($"Issuing tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({taxCode})", true);
+                return new PostResult($"Issuing {(suspended ? "suspended " : "")}tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({taxCode})", true);
             }
         }
     }

@@ -37,6 +37,7 @@ The Smart Tax legal action has the following properties:
 | Amount | Number | The amount to collect. This can be a fixed number or any regular Eco expression, e.g. a function of wealth or context. |
 | Target | Citizen/Title/Demographic | Who to apply the tax to. If this refers to multiple citizens, e.g. via a title or demographic, each citizen will be taxed the full amount. |
 | Tax Code | _String_ | An optional name for the tax. This helps distinguish it from other taxes on the tax card and in the tax log. By default, the name of the law or executive action will be used. |
+| Suspended | Boolean | Whether the tax should be suspended. A suspended tax will not be collected until another non-suspended tax is issued to the citizen with the same target bank account and currency (but not necessarily the same tax code). Suspended taxes will still show on the tax card and may still be relieved by rebates or payments. |
 | Silent | Boolean | Whether any notifications for the tax should be suppressed. Defaults to "No". This is helpful to set when applying a tax on a high frequency event, for example, the pollute air or the block placement law trigger. Silent taxes will still show on the tax card, in the tax log and will still make a notification when they're actually collected. |
 | Infobox On Success | Boolean | This is built into all Eco's legal actions. For this particular one, it is not very useful, as Silent does the same thing. |
 

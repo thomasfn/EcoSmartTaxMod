@@ -29,7 +29,9 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public float Amount { get; set; }
 
-        public LocString Description => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} to {TargetAccount.UILink()} ({TaxCode})");
+        [Serialized] public bool Suspended { get; set; }
+
+        public LocString Description => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} to {TargetAccount.UILink()} ({TaxCode}){(Suspended ? " (suspended)" :"")}");
     }
 
     [Serialized]
@@ -82,13 +84,22 @@ namespace Eco.Mods.SmartTax
             return taxCard;
         }
 
-        public void RecordTax(BankAccount targetAccount, Currency currency, string taxCode, float amount)
+        public void RecordTax(BankAccount targetAccount, Currency currency, string taxCode, float amount, bool suspended)
         {
             if (amount < Transfers.AlmostZero) { return; }
             var taxEntry = TaxDebts.GetOrCreate(
                 taxEntry => taxEntry.TargetAccount == targetAccount && taxEntry.Currency == currency && taxEntry.TaxCode == taxCode,
-                () => new TaxDebt { TargetAccount = targetAccount, Currency = currency, TaxCode = taxCode, Amount = 0.0f }
+                () => new TaxDebt { TargetAccount = targetAccount, Currency = currency, TaxCode = taxCode, Amount = 0.0f, Suspended = suspended }
             );
+            if (!suspended)
+            {
+                // Activate any other suspended taxes toward the same account
+                foreach (var otherDebt in TaxDebts.Where(otherDebt => otherDebt.TargetAccount == targetAccount && otherDebt.Currency == currency))
+                {
+                    otherDebt.Suspended = false;
+                }
+                taxEntry.Suspended = false;
+            }
             taxEntry.Amount += amount;
             TaxLog.AddTaxEvent(new RecordTaxEvent(targetAccount, taxCode, amount, currency));
         }
@@ -138,14 +149,28 @@ namespace Eco.Mods.SmartTax
                 .Sum();
 
         public LocString DebtSummary()
-            => TaxDebts.Any() ? Localizer.DoStr(string.Join(", ",
-                 TaxDebts
+        {
+            var debts = TaxDebts
                     .GroupBy(taxDebt => taxDebt.Currency)
-                    .Select(grouping => $"{grouping.Key.UILink(GetDebtSum(taxDebt => taxDebt.Currency == grouping.Key) - GetRebateSum(taxRebate => taxRebate.Currency == grouping.Key) - GetPaymentSum(paymentCredit => paymentCredit.Currency == grouping.Key))}")
-               )) : Localizer.DoStr("nothing");
+                    .Select(grouping => (grouping, GetDebtSum(taxDebt => taxDebt.Currency == grouping.Key) - GetRebateSum(taxRebate => taxRebate.Currency == grouping.Key) - GetPaymentSum(paymentCredit => paymentCredit.Currency == grouping.Key)))
+                    .Where(groupingAndDebt => groupingAndDebt.Item2 > 0.0f)
+                    .Select(groupingAndDebt => $"{groupingAndDebt.grouping.Key.UILink(groupingAndDebt.Item2)}");
+            return debts.Any() ? Localizer.DoStr(string.Join(", ", debts)) : Localizer.DoStr("nothing");
+        }
+
+        public LocString CreditSummary()
+        {
+            var credits = TaxDebts
+                    .GroupBy(taxDebt => taxDebt.Currency)
+                    .Select(grouping => (grouping, GetDebtSum(taxDebt => taxDebt.Currency == grouping.Key) - GetRebateSum(taxRebate => taxRebate.Currency == grouping.Key) - GetPaymentSum(paymentCredit => paymentCredit.Currency == grouping.Key)))
+                    .Where(groupingAndDebt => groupingAndDebt.Item2 < 0.0f)
+                    .Select(groupingAndDebt => $"{groupingAndDebt.grouping.Key.UILink(-groupingAndDebt.Item2)}");
+            return credits.Any() ? Localizer.DoStr(string.Join(", ", credits)) : Localizer.DoStr("nothing");
+        }
+           
 
         [Tooltip(100)] public override LocString Description()
-            => Localizer.Do($"Owes {DebtSummary()}.\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}");
+            => Localizer.Do($"Owes {DebtSummary()}, due {CreditSummary()}.\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}");
 
         public LocString DescribeDebts()
         {
@@ -325,6 +350,9 @@ namespace Eco.Mods.SmartTax
         /// <param name="pack"></param>
         private void TickDebt(TaxDebt taxDebt, GameActionPack pack)
         {
+            // If it's suspended, don't try and collect yet
+            if (taxDebt.Suspended) { return; }
+
             // Get their current wealth in the debt's currency
             var accounts = Transfers.GetTaxableAccountsForUser(Creator, taxDebt.Currency);
             var total = 0.0f;

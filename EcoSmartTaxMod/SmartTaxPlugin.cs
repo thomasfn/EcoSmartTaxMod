@@ -113,7 +113,7 @@ namespace Eco.Mods.SmartTax
         public static void Card(User user)
         {
             var taxCard = TaxCard.GetOrCreateForUser(user);
-            user.MsgLoc($"{taxCard.UILink()} owes {taxCard.DebtSummary()}");
+            user.MsgLoc($"{taxCard.UILink()} owes {taxCard.DebtSummary()}, due {taxCard.CreditSummary()}");
         }
 
         [ChatSubCommand("Tax", "Performs a tax tick immediately.", ChatAuthorizationLevel.Admin)]
