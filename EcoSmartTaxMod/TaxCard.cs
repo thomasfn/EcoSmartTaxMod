@@ -102,6 +102,7 @@ namespace Eco.Mods.SmartTax
             }
             taxEntry.Amount += amount;
             TaxLog.AddTaxEvent(new RecordTaxEvent(targetAccount, taxCode, amount, currency));
+            this.Changed(nameof(Description));
         }
 
         public void RecordPayment(BankAccount sourceAccount, Currency currency, string paymentCode, float amount)
@@ -113,6 +114,7 @@ namespace Eco.Mods.SmartTax
             );
             paymentCredit.Amount += amount;
             TaxLog.AddTaxEvent(new RecordPaymentEvent(sourceAccount, paymentCode, amount, currency));
+            this.Changed(nameof(Description));
         }
 
         public void RecordRebate(BankAccount targetAccount, Currency currency, string rebateCode, float amount)
@@ -124,6 +126,7 @@ namespace Eco.Mods.SmartTax
             );
             taxRebate.Amount += amount;
             TaxLog.AddTaxEvent(new RecordRebateEvent(targetAccount, rebateCode, amount, currency));
+            this.Changed(nameof(Description));
         }
 
         public override void OnLinkClicked(TooltipContext context) => context.Player.OpenInfoPanel(Localizer.Do($"Log for {this.UILink()}"), this.TaxLog.RenderToText(), "BankTransactions");
@@ -232,12 +235,15 @@ namespace Eco.Mods.SmartTax
                 TickDebt(taxDebt, pack);
             }
 
+            if (pack.Empty) { return; }
+
             // Perform action
             var result = pack.TryPerform();
             if (result.Failed)
             {
                 Logger.Error($"Failed to perform GameActionPack with tax transfers: {result.Message}");
             }
+            this.Changed(nameof(Description));
         }
 
         /// <summary>
