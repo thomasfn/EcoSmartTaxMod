@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Eco.Mods.SmartTax
@@ -57,23 +58,32 @@ namespace Eco.Mods.SmartTax
             var rebateCode = string.IsNullOrEmpty(this.RebateCode) ? description : this.RebateCode;
             var silent = this.Silent?.Value(context).Val ?? false;
 
-            if (targetBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
+            if (currency == null) { return new PostResult($"Transfer currency must be set.", true); }
+            if (targetBankAccount == null) { return new PostResult($"Target bank account must be set.", true); }
 
             var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult(Localizer.DoStr("Rebate without target citizen skipped."), true); }
+            if (users == null || users.Length == 0) { return new PostResult($"Rebate without target citizen skipped.", true); }
+
+            if (silent)
+            {
+                return new PostResult(() =>
+                {
+                    RecordRebateForUsers(users, targetBankAccount, currency, rebateCode, amount);
+                });
+            }
+            return new PostResult(() =>
+            {
+                RecordRebateForUsers(users, targetBankAccount, currency, rebateCode, amount);
+                return Localizer.Do($"Issuing rebate of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({rebateCode})");
+            });
+        }
+
+        private void RecordRebateForUsers(IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string rebateCode, float amount)
+        {
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
                 taxCard.RecordRebate(targetBankAccount, currency, rebateCode, amount);
-            }
-
-            if (silent)
-            {
-                return PostResult.Succeeded;
-            }
-            else
-            {
-                return new PostResult($"Issuing rebate of {currency.UILinkContent(amount)} from {targetBankAccount.UILink()} to {alias.UILinkGeneric()} ({rebateCode})", true);
             }
         }
     }

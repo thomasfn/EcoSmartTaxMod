@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Eco.Mods.SmartTax
@@ -57,23 +58,32 @@ namespace Eco.Mods.SmartTax
             var paymentCode = string.IsNullOrEmpty(this.PaymentCode) ? description : this.PaymentCode;
             var silent = this.Silent?.Value(context).Val ?? false;
 
-            if (sourceBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
+            if (currency == null) { return new PostResult($"Transfer currency must be set.", true); }
+            if (sourceBankAccount == null) { return new PostResult($"Source bank account must be set.", true); }
 
             var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult(Localizer.DoStr("Payment without target citizen skipped."), true); }
+            if (users == null || users.Length == 0) { return new PostResult($"Payment without target citizen skipped.", true); }
+
+            if (silent)
+            {
+                return new PostResult(() =>
+                {
+                    RecordPaymentForUsers(users, sourceBankAccount, currency, paymentCode, amount);
+                });
+            }
+            return new PostResult(() =>
+            {
+                RecordPaymentForUsers(users, sourceBankAccount, currency, paymentCode, amount);
+                return Localizer.Do($"Issuing payment of {currency.UILinkContent(amount)} from {sourceBankAccount.UILink()} to {alias.UILinkGeneric()} ({paymentCode})");
+            });
+        }
+
+        private void RecordPaymentForUsers(IEnumerable<User> users, BankAccount sourceBankAccount, Currency currency, string paymentCode, float amount)
+        {
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
                 taxCard.RecordPayment(sourceBankAccount, currency, paymentCode, amount);
-            }
-
-            if (silent)
-            {
-                return PostResult.Succeeded;
-            }
-            else
-            {
-                return new PostResult($"Issuing payment of {currency.UILinkContent(amount)} from {sourceBankAccount.UILink()} to {alias.UILinkGeneric()} ({paymentCode})", true);
             }
         }
     }
