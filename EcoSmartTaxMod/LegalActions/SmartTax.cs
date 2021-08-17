@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Eco.Mods.SmartTax
@@ -65,23 +66,32 @@ namespace Eco.Mods.SmartTax
             var suspended = this.Suspended?.Value(context).Val ?? false;
             var silent = this.Silent?.Value(context).Val ?? false;
 
-            if (targetBankAccount == null || currency == null) { return PostResult.FailedNoMessage; }
-            
+            if (currency == null) { return new PostResult($"Transfer currency must be set.", true); }
+            if (targetBankAccount == null) { return new PostResult($"Target bank account must be set.", true); }
+
             var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult(Localizer.DoStr("Taxation without target citizen skipped."), true); }
+            if (users == null || users.Length == 0) { return new PostResult($"Taxation without target citizen skipped.", true); }
+
+            if (silent)
+            {
+                return new PostResult(() =>
+                {
+                    RecordTaxForUsers(users, targetBankAccount, currency, taxCode, amount, suspended);
+                });
+            }
+            return new PostResult(() =>
+            {
+                RecordTaxForUsers(users, targetBankAccount, currency, taxCode, amount, suspended);
+                return Localizer.Do($"Issuing {(suspended ? "suspended " : "")}tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({taxCode})");
+            });
+        }
+
+        private void RecordTaxForUsers(IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string taxCode, float amount, bool suspended)
+        {
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
                 taxCard.RecordTax(targetBankAccount, currency, taxCode, amount, suspended);
-            }
-
-            if (silent)
-            {
-                return PostResult.Succeeded;
-            }
-            else
-            {
-                return new PostResult($"Issuing {(suspended ? "suspended " : "")}tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({taxCode})", true);
             }
         }
     }
