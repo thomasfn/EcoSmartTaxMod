@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Eco.Mods.SmartTax
 {
@@ -31,7 +32,14 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public bool Suspended { get; set; }
 
-        public LocString Description => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} to {TargetAccount.UILink()} ({TaxCode}){(Suspended ? " (suspended)" :"")}");
+        public LocString Description
+            => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} to {TargetAccount.UILink()} ({TaxCode}){(Suspended ? " (suspended)" :"")}");
+
+        public LocString ReportDescription
+            => Localizer.Do($"Tax ({TaxCode}) of {Currency.UILinkContent(Amount)} (to {TargetAccount.UILink()})");
+
+        public LocString ReportDescriptionNoAccount
+            => Localizer.Do($"Tax ({TaxCode}) of {Currency.UILinkContent(Amount)}");
     }
 
     [Serialized]
@@ -46,6 +54,12 @@ namespace Eco.Mods.SmartTax
         [Serialized] public float Amount { get; set; }
 
         public LocString Description => Localizer.Do($"Rebate of {Currency.UILinkContent(Amount)} from {TargetAccount.UILink()} ({RebateCode})");
+
+        public LocString ReportDescription
+            => Localizer.Do($"Rebate ({RebateCode}) of {Currency.UILinkContent(Amount)} (to {TargetAccount.UILink()})");
+
+        public LocString ReportDescriptionNoAccount
+            => Localizer.Do($"Rebate ({RebateCode}) of {Currency.UILinkContent(Amount)}");
     }
 
     [Serialized]
@@ -60,18 +74,26 @@ namespace Eco.Mods.SmartTax
         [Serialized] public float Amount { get; set; }
 
         public LocString Description => Localizer.Do($"Payment of {Currency.UILinkContent(Amount)} from {SourceAccount.UILink()} ({PaymentCode})");
+
+        public LocString ReportDescription
+            => Localizer.Do($"Payment ({PaymentCode}) of {Currency.UILinkContent(Amount)} (from {SourceAccount.UILink()})");
+
+        public LocString ReportDescriptionNoAccount
+            => Localizer.Do($"Payment ({PaymentCode}) of {Currency.UILinkContent(Amount)}");
     }
 
     [Serialized, ForceCreateView]
     public class TaxCard : SimpleEntry
     {
-        [Serialized] public ThreadSafeList<TaxDebt> TaxDebts { get; private set; } = new ThreadSafeList<TaxDebt>();
+        [Serialized, NotNull] public ThreadSafeList<TaxDebt> TaxDebts { get; private set; } = new ThreadSafeList<TaxDebt>();
 
-        [Serialized] public ThreadSafeList<TaxRebate> TaxRebates { get; private set; } = new ThreadSafeList<TaxRebate>();
+        [Serialized, NotNull] public ThreadSafeList<TaxRebate> TaxRebates { get; private set; } = new ThreadSafeList<TaxRebate>();
 
-        [Serialized] public ThreadSafeList<PaymentCredit> PaymentCredits { get; private set; } = new ThreadSafeList<PaymentCredit>();
+        [Serialized, NotNull] public ThreadSafeList<PaymentCredit> PaymentCredits { get; private set; } = new ThreadSafeList<PaymentCredit>();
 
-        [Serialized] public TaxLog TaxLog { get; private set; } = new TaxLog();
+        [Serialized, NotNull] public TaxLog TaxLog { get; private set; } = new TaxLog();
+
+        [Serialized, NotNull] public Reports.Report Report { get; private set; } = new Reports.Report();
 
         public static TaxCard GetOrCreateForUser(User user)
         {
@@ -102,6 +124,11 @@ namespace Eco.Mods.SmartTax
             }
             taxEntry.Amount += amount;
             TaxLog.AddTaxEvent(new RecordTaxEvent(targetAccount, taxCode, amount, currency));
+            Report.RecordTax(targetAccount, currency, taxCode, amount);
+            if (targetAccount is GovernmentBankAccount targetGovAccount)
+            {
+                GovTaxCard.GetOrCreateForAccount(targetGovAccount).RecordTax(currency, taxCode, amount);
+            }
             this.Changed(nameof(Description));
         }
 
@@ -114,6 +141,11 @@ namespace Eco.Mods.SmartTax
             );
             paymentCredit.Amount += amount;
             TaxLog.AddTaxEvent(new RecordPaymentEvent(sourceAccount, paymentCode, amount, currency));
+            Report.RecordPayment(sourceAccount, currency, paymentCode, amount);
+            if (sourceAccount is GovernmentBankAccount sourceGovAccount)
+            {
+                GovTaxCard.GetOrCreateForAccount(sourceGovAccount).RecordPayment(currency, paymentCode, amount);
+            }
             this.Changed(nameof(Description));
         }
 
@@ -126,10 +158,26 @@ namespace Eco.Mods.SmartTax
             );
             taxRebate.Amount += amount;
             TaxLog.AddTaxEvent(new RecordRebateEvent(targetAccount, rebateCode, amount, currency));
+            Report.RecordRebate(targetAccount, currency, rebateCode, amount);
+            if (targetAccount is GovernmentBankAccount targetGovAccount)
+            {
+                GovTaxCard.GetOrCreateForAccount(targetGovAccount).RecordRebate(currency, rebateCode, amount);
+            }
             this.Changed(nameof(Description));
         }
 
-        public override void OnLinkClicked(TooltipContext context) => context.Player.OpenInfoPanel(Localizer.Do($"Log for {this.UILink()}"), this.TaxLog.RenderToText(), "BankTransactions");
+        public void OpenTaxLog(Player player)
+        {
+            player.OpenInfoPanel(Localizer.Do($"Log for {this.UILink()}"), this.TaxLog.RenderToText(), "BankTransactions");
+        }
+
+        public void OpenReport(Player player)
+        {
+            
+            player.OpenInfoPanel(Localizer.Do($"Report for {this.UILink()}"), $"{TextLoc.UnderlineLocStr(Localizer.DoStr("Click to view log.").Link(TextLinkManager.GetLinkId(this)))}\nOutstanding:\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}\n\n{Report.Description}", "BankTransactions");
+        }
+
+        public override void OnLinkClicked(TooltipContext context) => OpenTaxLog(context.Player);
         public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view log.");
         public override LocString UILinkContent() => TextLoc.ItemIcon("Tax", Localizer.DoStr(this.Name));
 

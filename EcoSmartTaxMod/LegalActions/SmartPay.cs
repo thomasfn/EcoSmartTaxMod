@@ -23,7 +23,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Players;
 
     [Eco, LocCategory("Finance"), CreateComponentTab("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), LocDescription("A smarter payment that tracks credit if the payer can't afford it.")]
-    public class SmartPay_LegalAction : LegalAction, IExecutiveAction, ICustomValidity
+    public class SmartPay_LegalAction : LegalAction, ICustomValidity
     {
         [Eco, LocDescription("Where the money comes from. Only Government Accounts are allowed."), TaxDestinationsOnly]
         public GameValue<BankAccount> SourceBankAccount { get; set; } = Make.Treasury;
@@ -46,7 +46,7 @@ namespace Eco.Mods.SmartTax
         public override LocString Description()
             => Localizer.Do($"Issue payment of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.SourceBankAccount.DescribeNullSafe()} to {this.Target.DescribeNullSafe()}.");
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
-        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
+        //PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
 
         private PostResult Do(LocString description, IContextObject context, Law law)
