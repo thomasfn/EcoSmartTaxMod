@@ -17,7 +17,7 @@ namespace Eco.Mods.SmartTax
 
     using Gameplay.Players;
     using Gameplay.Systems.Chat;
-    using Gameplay.Systems.TextLinks;
+    using Gameplay.Economy;
 
     using Simulation.Time;
 
@@ -28,11 +28,14 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public Registrar TaxCards = new Registrar();
 
+        [Serialized] public Registrar GovTaxCards = new Registrar();
+
         public readonly PeriodicUpdateConfig UpdateTimer = new PeriodicUpdateConfig(true);
 
         public void InitializeRegistrars()
         {
             this.TaxCards.Init(Localizer.DoStr("TaxCards"), true, typeof(TaxCard), SmartTaxPlugin.Obj, Localizer.DoStr("Tax Cards"));
+            this.GovTaxCards.Init(Localizer.DoStr("GovTaxCards"), true, typeof(GovTaxCard), SmartTaxPlugin.Obj, Localizer.DoStr("Gov Tax Cards"));
         }
 
         public void Initialize()
@@ -115,11 +118,25 @@ namespace Eco.Mods.SmartTax
         [ChatCommand("Tax", ChatAuthorizationLevel.User)]
         public static void Tax() { }
 
-        [ChatSubCommand("Tax", "Retrieves the player's tax card.", ChatAuthorizationLevel.User)]
+        [ChatSubCommand("Tax", "Shows the player's tax card.", ChatAuthorizationLevel.User)]
         public static void Card(User user)
         {
             var taxCard = TaxCard.GetOrCreateForUser(user);
-            user.MsgLoc($"{taxCard.UILink()} owes {taxCard.DebtSummary()}, due {taxCard.CreditSummary()}");
+            taxCard.OpenReport(user.Player);
+        }
+
+        [ChatSubCommand("Tax", "Shows another player's tax card.", ChatAuthorizationLevel.User)]
+        public static void OtherCard(User user, User otherUser)
+        {
+            var taxCard = TaxCard.GetOrCreateForUser(otherUser);
+            taxCard.OpenReport(user.Player);
+        }
+
+        [ChatSubCommand("Tax", "Shows the account's government tax card.", ChatAuthorizationLevel.User)]
+        public static void GovCard(User user, GovernmentBankAccount account)
+        {
+            var taxCard = GovTaxCard.GetOrCreateForAccount(account);
+            taxCard.OpenReport(user.Player);
         }
 
         [ChatSubCommand("Tax", "Show time until the next tax tick.", ChatAuthorizationLevel.User)]
