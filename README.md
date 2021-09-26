@@ -3,25 +3,34 @@ A server mod for Eco 9.4 that extends the law and economy system with the follow
  - A smart tax legal action that defers collection to avoid transaction spam, and tracks debt if the citizen can't pay
  - A smart payment legal action that tracks credit if the government can't pay, and can be used to pay off tax debt
  - A smart rebate legal action that cancels out tax debt without being backed by currency
- - A tax card generated for each player showing their current debts, rebates and credits
+ - A tax card generated for each player showing their current outstanding debts, rebates and credits along with a personal financial report
  - A log attached to the tax card showing the last 100 tax and payment events, similar to a bank account's transaction log
+ - A government tax card generated for each government bank account showing a by-day report of taxes, payments and rebates issued
  - Legal expressions to query the citizen's current tax debt and payment credit within a law
+ - Legal expressions to query aggregate financial data such as how many taxes were paid within a given time period by a certain demographic
 
 ## Installation
-
-- Copy the `EcoSmartTaxMod.dll` file to `Mods` folder of the dedicated server.
-- Restart the server.
+1. Download `EcoSmartTaxMod.dll` from the [latest release](https://github.com/thomasfn/EcoSmartTaxMod/releases).
+2. Copy the `EcoSmartTaxMod.dll` file to `Mods` folder of the dedicated server.
+3. Restart the server.
 
 ## Usage
 
 ### Tax Card
-Any player can access their tax card by running the chat command `/tax card`. This will display a link in the player's chat to their tax card, as well as provide a quick tax debt rundown.
+Any player can access their tax card by running the chat command `/tax card`. This will open a window showing their current outstanding taxes, rebates and payments followed by a personal financial report containing daily breakdowns of their total taxes, rebates and payments issued.
 
-![Tax Card Chat Command](./screenshots/taxcard-chatcommand.png "Tax Card Chat Command")
+![Tax Card Report](./screenshots/taxcard-report.png "Tax Card Report")
 
-Clicking on the link will open the tax log. This shows the last 100 tax events in a UI very similar to the bank account transaction log.
+Clicking on the "Click to view log" link at the top will open the tax log. This shows the last 100 tax events in a UI very similar to the bank account transaction log.
 
 ![Tax Card Tax Log Simple](./screenshots/taxcard-log-simple.png "Tax Card Tax Log Simple")
+
+You can view the tax card of another player using the chat command `/tax othercard {player name}`.
+
+### Government Tax Card
+Any player can access a government tax card by running the chat command `/tax govcard {gov bank account name}`. This will open a window showing a financial report containing daily breakdowns of all taxes, rebates and payments issued to/from this account.
+
+![Gov Tax Card Report](./screenshots/govtaxcard-report.png "Gov Tax Card Report")
 
 ### Smart Tax
 A tax can be issued to a player using the Smart Tax legal action from a law or executive action. This is used in a very similar manner to the vanilla Tax legal action. The Smart Tax can be found in the Finance section along with the other currency related legal actions. The important distiniction is that the Smart Tax will not collect any currency right away, instead it will try to collect on the next tax tick, which by default runs every 5 minutes. This is to avoid spamming the bank account transaction logs. Successful tax collections will trigger the "Pay Tax" law trigger.
@@ -147,6 +156,46 @@ For example, consider the following simple custom chat command law:
 
 The example Road Development law above also makes use of this game value.
 
+### Query Taxes Issued
+The total amount of taxes issued via smart tax can be queried via the Query Taxes Issued game value. This has some flexibility about what is included in the total, including filtering by tax code, target bank account and time period.
+
+The Query Taxes Issued game value has the following properties:
+
+| Property Name | Type | Description |
+| - | - | - |
+| Currency | Currency | The currency of the issued taxes to query. |
+| Target | Alias | The citizen, title or demographic to query the taxes issued to. For example this could be "Everyone" to get an aggregate of all taxes paid, or a single citizen e.g. a chat command based query. |
+| _Filter Target Acccount_ | Government Bank Account | Can be none. If set, only taxes issued to this bank account are considered. |
+| _Filter Tax Code_ | string | Can be blank. If set, only taxes issued with this tax code are considered. |
+| Interval Start | number | See below for how the interval settings work. |
+| Interval End | number | See below for how the interval settings work. |
+| Interval Relative | boolean | See below for how the interval settings work. |
+
+### Query Payments Issued
+The total amount of taxes issued via smart tax can be queried via the Query Taxes Issued game value. This has some flexibility about what is included in the total, including filtering by tax code, target bank account and time period.
+
+The Query Taxes Issued game value has the following properties:
+
+| Property Name | Type | Description |
+| - | - | - |
+| Currency | Currency | The currency of the issued taxes to query. |
+| Target | Alias | The citizen, title or demographic to query the taxes issued to. For example this could be "Everyone" to get an aggregate of all taxes paid, or a single citizen e.g. a chat command based query. |
+| _Filter Target Acccount_ | Government Bank Account | Can be none. If set, only taxes issued to this bank account are considered. |
+| _Filter Tax Code_ | string | Can be blank. If set, only taxes issued with this tax code are considered. |
+| Interval Start | number | See below for how the interval settings work. |
+| Interval End | number | See below for how the interval settings work. |
+| Interval Relative | boolean | See below for how the interval settings work. |
+
+### Intervals
+Both Query Taxes Issued and Query Payments Issued game values support an interval via the Interval Start, Interval End and Interval Relative properties. These constrain the query to only consider taxes or payments within a certain time period. Since tracking of issued taxes/payments is per-day, the interval may only cover a period of whole days - it's impossible to query over a smaller time period than that.
+
+The time period is described as a range between two days with a start and end day index, both inclusive. Day indices are zero based, e.g. 0 would be the first day.
+
+The Interval Start and Interval End are day indices that are either _absolute_ or _relative_, depending on what Interval Relative resolves to when the law runs.
+- Absolute day indices are relative to day 0 and positives track forwards - for example, Interval Start = 0 and Interval End = 1 would cover the 1st and 2nd days since server start.
+- Relative day indices are relative to the current day and positives track backwards - for example, Interval Start = 0 and Interval End = 1 would cover "today" and "yesterday".
+- To represent "all time", e.g. from day 0 to present, use Interval Relative = No, Interval Start = 0 and Interval End = World Time In Days
+
 ### For Admins
 The tax card is stored in the game save along with all other objects such as bank accounts. A player's tax card can be wiped using the `/objects remove taxcards,{id}` command. A new blank one will then be created for the player when they next use `/tax card` or a tax/payment/rebate is issued to them.
 
@@ -162,7 +211,7 @@ The tax card is stored in the game save along with all other objects such as ban
 
 ### Linux
 
-1. Run `ECO_BRANCH="release" MODKIT_VERSION="0.9.4.0-beta" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
+1. Run `ECO_BRANCH="release" MODKIT_VERSION="0.9.4.3-beta" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
 2. Enter the `EcoSmartTaxMod` directory and run:
 `dotnet restore`
 `dotnet build`
