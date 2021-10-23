@@ -45,31 +45,16 @@ namespace Eco.Mods.SmartTax
     [Serialized, ForceCreateView]
     public class Company : SimpleEntry
     {
-        static Company()
-        {
-            PropertyManager.OnDeedOwnerChanged.Add(OnDeedOwnerChanged);
-        }
-
-        private static void OnDeedOwnerChanged()
-        {
-            foreach (var deed in PropertyManager.GetAllDeeds())
-            {
-                if (deed.Owners is User userOwner)
-                {
-                    var company = GetFromLegalPerson(userOwner);
-                    if (company != null)
-                    {
-                        company.OnNowOwnerOfProperty(deed);
-                    }
-                }
-            }
-        }
+        
 
         public static Company GetEmployer(User user)
             => Registrars.All<Company>().Where(x => x.IsEmployee(user)).SingleOrDefault();
 
         public static Company GetFromLegalPerson(User user)
             => Registrars.All<Company>().Where(x => x.LegalPerson == user).SingleOrDefault();
+
+        public static Company GetFromLegalPerson(IAlias alias)
+            => GetFromLegalPerson(alias.OneUser());
 
         public static Company GetFromBankAccount(BankAccount bankAccount)
             => Registrars.All<Company>().Where(x => x.BankAccount == bankAccount).SingleOrDefault();
@@ -218,7 +203,7 @@ namespace Eco.Mods.SmartTax
             UpdateBankAccountAuthList(BankAccount);
         }
 
-        private void OnNowOwnerOfProperty(Deed deed)
+        public void OnNowOwnerOfProperty(Deed deed)
         {
             SendCompanyMessage(Localizer.Do($"{this.UILink()} is now the owner of {deed.UILink()}"));
             UpdateDeedAuthList(deed);

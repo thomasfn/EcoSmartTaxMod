@@ -35,6 +35,22 @@ namespace Eco.Mods.SmartTax
         public CompanyManager()
         {
             ActionUtil.AddListener(this);
+            PropertyManager.OnDeedOwnerChanged.Add(OnDeedOwnerChanged);
+        }
+
+        private static void OnDeedOwnerChanged()
+        {
+            foreach (var deed in PropertyManager.GetAllDeeds())
+            {
+                if (deed.Owners is User userOwner)
+                {
+                    var company = Company.GetFromLegalPerson(userOwner);
+                    if (company != null)
+                    {
+                        company.OnNowOwnerOfProperty(deed);
+                    }
+                }
+            }
         }
 
         public Company CreateNew(User ceo, string name)
@@ -50,9 +66,6 @@ namespace Eco.Mods.SmartTax
         {
             switch (action)
             {
-                case TradeAction tradeAction:
-                    // TODO: Find out if the seller or buyer is an employee and direct the trade action to their company
-                    break;
                 case MoneyGameAction moneyGameAction:
                     var sourceCompany = Company.GetFromBankAccount(moneyGameAction.SourceBankAccount);
                     sourceCompany?.OnGiveMoney(moneyGameAction);
@@ -62,6 +75,35 @@ namespace Eco.Mods.SmartTax
             }
         }
 
-        public Result ShouldOverrideAuth(GameAction action) => null;
+        public Result ShouldOverrideAuth(GameAction action)
+        {
+            if (action is PropertyTransfer propertyTransferAction)
+            {
+                // If the deed is company property, allow an employee to transfer ownership
+                Company deedOwnerCompany = null;
+                foreach (var deed in propertyTransferAction.RelatedDeeds)
+                {
+                    var ownerCompany = Company.GetFromLegalPerson(deed.Owners);
+                    if (ownerCompany == null || ownerCompany != deedOwnerCompany)
+                    {
+                        deedOwnerCompany = null;
+                        break;
+                    }
+                    deedOwnerCompany = ownerCompany;
+                }
+                if (deedOwnerCompany == null) { return null; }
+                if (!deedOwnerCompany.IsEmployee(propertyTransferAction.Citizen)) { return null; }
+                return Result.Succeed(Localizer.Do($"{propertyTransferAction.Citizen.UILink()} is an employee of {deedOwnerCompany.UILink()}"));
+            }
+            if (action is ClaimOrUnclaimProperty claimOrUnclaimPropertyAction)
+            {
+                // If the deed is company property, allow an employee to claim or unclaim it
+                var deedOwnerCompany = Company.GetFromLegalPerson(claimOrUnclaimPropertyAction.PreviousDeedOwner);
+                if (deedOwnerCompany == null) { return null; }
+                if (!deedOwnerCompany.IsEmployee(claimOrUnclaimPropertyAction.Citizen)) { return null; }
+                return Result.Succeed(Localizer.Do($"{claimOrUnclaimPropertyAction.Citizen.UILink()} is an employee of {deedOwnerCompany.UILink()}"));
+            }
+            return null;
+        }
     }
 }
