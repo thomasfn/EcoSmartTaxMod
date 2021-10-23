@@ -9,17 +9,17 @@ namespace Eco.Mods.SmartTax
     {
         public static void Debug(string message)
         {
-            Log.Write(new LocString("[CivicsImpExpPlugin] DEBUG: " + message + "\n"));
+            Log.Write(new LocString("[SmartTax] DEBUG: " + message + "\n"));
         }
 
         public static void Info(string message)
         {
-            Log.Write(new LocString("[CivicsImpExpPlugin] " + message + "\n"));
+            Log.Write(new LocString("[SmartTax] " + message + "\n"));
         }
 
         public static void Error(string message)
         {
-            Log.Write(new LocString("[CivicsImpExpPlugin] ERROR: " + message + "\n"));
+            Log.Write(new LocString("[SmartTax] ERROR: " + message + "\n"));
         }
     }
 }
