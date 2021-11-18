@@ -103,7 +103,14 @@ namespace Eco.Mods.SmartTax
             {
                 foreach (var taxCard in data.TaxCards.All<TaxCard>())
                 {
-                    taxCard.Tick();
+                    try
+                    {
+                        taxCard.Tick();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error($"Error while running tax tick on tax card {taxCard.Id} ('{taxCard.Name}'): {ex}");
+                    }
                 }
                 SaveAll();
             }
