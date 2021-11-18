@@ -148,6 +148,21 @@ namespace Eco.Mods.SmartTax
     }
 
     [Serialized]
+    public class VoidEvent : TaxEvent
+    {
+        public VoidEvent() { }
+        public VoidEvent(TaxDebt taxDebt, string reason = "target bank account was closed")
+            : base(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxDebt.Description} voided as {reason}"))
+        { }
+        public VoidEvent(PaymentCredit paymentCredit, string reason = "source bank account was closed")
+            : base(paymentCredit.SourceAccount, paymentCredit.PaymentCode, Localizer.Do($"{paymentCredit.Description} voided as {reason}"))
+        { }
+        public VoidEvent(TaxRebate taxRebate, string reason = "target bank account was closed")
+            : base(taxRebate.TargetAccount, taxRebate.RebateCode, Localizer.Do($"{taxRebate.Description} voided as {reason}"))
+        { }
+    }
+
+    [Serialized]
     public class TaxLog
     {
         public static readonly ThreadSafeAction<TaxLog, TaxEvent> OnTaxEvent = new ThreadSafeAction<TaxLog, TaxEvent>();

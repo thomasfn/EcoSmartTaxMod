@@ -254,6 +254,8 @@ namespace Eco.Mods.SmartTax
         {
             if (Creator == null) { return; }
 
+            CheckInvalidAccounts();
+
             var pack = new GameActionPack();
 
             // Iterate debts, smallest first, try to cancel out with rebates
@@ -292,6 +294,34 @@ namespace Eco.Mods.SmartTax
                 Logger.Error($"Failed to perform GameActionPack with tax transfers: {result.Message}");
             }
             this.Changed(nameof(Description));
+        }
+
+        private void CheckInvalidAccounts()
+        {
+            var taxDebtsToVoid = TaxDebts
+                .Where(taxDebt => taxDebt.TargetAccount == null || taxDebt.TargetAccount.IsDestroyed)
+                .ToArray();
+            foreach (var taxDebt in taxDebtsToVoid)
+            {
+                TaxDebts.Remove(taxDebt);
+                TaxLog.AddTaxEvent(new VoidEvent(taxDebt));
+            }
+            var taxRebatesToVoid = TaxRebates
+                .Where(taxRebate => taxRebate.TargetAccount == null || taxRebate.TargetAccount.IsDestroyed)
+                .ToArray();
+            foreach (var taxRebate in taxRebatesToVoid)
+            {
+                TaxRebates.Remove(taxRebate);
+                TaxLog.AddTaxEvent(new VoidEvent(taxRebate));
+            }
+            var paymentCreditsToVoid = PaymentCredits
+                .Where(paymentCredit => paymentCredit.SourceAccount == null || paymentCredit.SourceAccount.IsDestroyed)
+                .ToArray();
+            foreach (var paymentCredit in paymentCreditsToVoid)
+            {
+                PaymentCredits.Remove(paymentCredit);
+                TaxLog.AddTaxEvent(new VoidEvent(paymentCredit));
+            }
         }
 
         /// <summary>
