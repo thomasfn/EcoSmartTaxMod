@@ -37,7 +37,7 @@ namespace Eco.Mods.SmartTax
         [Eco, Advanced, LocDescription("The player or group to tax.")]
         public GameValue<IAlias> Target { get; set; }
 
-        [Eco, LocDescription("A custom name for the tax. If left blank, the name of the law will be used instead."), AllowNull]
+        [Eco, LocDescription("A custom name for the tax. If left blank, the name of the law will be used instead."), AllowNullInView]
         public string TaxCode { get; set; }
 
         [Eco, LocDescription("If true, the tax will not be collected until it is activated, which happens when another non-suspended tax is issued to the same target account and currency.")]

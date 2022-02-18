@@ -177,7 +177,7 @@ namespace Eco.Mods.SmartTax
             player.OpenInfoPanel(Localizer.Do($"Report for {this.UILink()}"), $"{TextLoc.UnderlineLocStr(Localizer.DoStr("Click to view log.").Link(TextLinkManager.GetLinkId(this)))}\nOutstanding:\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}\n\n{Report.Description}", "BankTransactions");
         }
 
-        public override void OnLinkClicked(TooltipContext context) => OpenTaxLog(context.Player);
+        public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenTaxLog(context.Player);
         public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view log.");
         public override LocString UILinkContent() => TextLoc.ItemIcon("Tax", Localizer.DoStr(this.Name));
 
@@ -475,7 +475,7 @@ namespace Eco.Mods.SmartTax
             TargetAccount = null,        // For taxes: use TaxDestination instead of TargetAccount.
             TaxDestination = targetAccount,
             TaxRate = 1.0f,                // 100% of TaxableAmount must be payed.
-            ServerMessageToAll = DefaultChatTags.Tax,
+            ServerMessageToAll = NotificationCategory.Tax,
 
             // Shared defaults (always the same).
             Currency = currency,
@@ -498,7 +498,7 @@ namespace Eco.Mods.SmartTax
             TargetAccount = paymentReceiver.BankAccount,
             TaxDestination = null,
             TaxRate = 0.0f,
-            ServerMessageToAll = DefaultChatTags.Finance,
+            ServerMessageToAll = NotificationCategory.Finance,
 
             // Shared defaults (always the same).
             Currency = currency,

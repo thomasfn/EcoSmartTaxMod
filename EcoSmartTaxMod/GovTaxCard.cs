@@ -57,7 +57,8 @@ namespace Eco.Mods.SmartTax
             player.OpenInfoPanel(Localizer.Do($"Report for {this.UILink()}"), $"{Report.DescriptionNoAccount}", "BankTransactions");
         }
 
-        public override void OnLinkClicked(TooltipContext context) => OpenReport(context.Player);
+        public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenReport(context.Player);
+
         public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view report.");
         public override LocString UILinkContent() => TextLoc.ItemIcon("Tax", Localizer.DoStr(this.Name));
 

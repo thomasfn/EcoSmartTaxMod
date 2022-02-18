@@ -1,4 +1,7 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
@@ -16,8 +19,8 @@ namespace Eco.Mods.SmartTax
     using Shared.Serialization;
 
     using Gameplay.Players;
-    using Gameplay.Systems.Chat;
     using Gameplay.Economy;
+    using Gameplay.Systems.Messaging.Chat.Commands;
 
     using Simulation.Time;
 
@@ -26,16 +29,16 @@ namespace Eco.Mods.SmartTax
     {
         public IPersistent StorageHandle { get; set; }
 
-        [Serialized] public Registrar TaxCards = new Registrar();
+        [Serialized] public Registrar<TaxCard> TaxCards = new ();
 
-        [Serialized] public Registrar GovTaxCards = new Registrar();
+        [Serialized] public Registrar<GovTaxCard> GovTaxCards = new ();
 
         public readonly PeriodicUpdateConfig UpdateTimer = new PeriodicUpdateConfig(true);
 
         public void InitializeRegistrars()
         {
-            this.TaxCards.Init(Localizer.DoStr("TaxCards"), true, typeof(TaxCard), SmartTaxPlugin.Obj, Localizer.DoStr("Tax Cards"));
-            this.GovTaxCards.Init(Localizer.DoStr("GovTaxCards"), true, typeof(GovTaxCard), SmartTaxPlugin.Obj, Localizer.DoStr("Gov Tax Cards"));
+            this.TaxCards.PreInit(Localizer.DoStr("TaxCards"), true, SmartTaxPlugin.Obj, Localizer.DoStr("Tax Cards"));
+            this.GovTaxCards.PreInit(Localizer.DoStr("GovTaxCards"), true, SmartTaxPlugin.Obj, Localizer.DoStr("Gov Tax Cards"));
         }
 
         public void Initialize()
@@ -101,7 +104,7 @@ namespace Eco.Mods.SmartTax
         {
             try
             {
-                foreach (var taxCard in data.TaxCards.All<TaxCard>())
+                foreach (var taxCard in data.TaxCards)
                 {
                     try
                     {
