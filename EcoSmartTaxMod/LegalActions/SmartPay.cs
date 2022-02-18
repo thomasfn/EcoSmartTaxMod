@@ -37,7 +37,7 @@ namespace Eco.Mods.SmartTax
         [Eco, Advanced, LocDescription("The player or group to pay.")]
         public GameValue<IAlias> Target { get; set; }
 
-        [Eco, LocDescription("A custom name for the payment. If left blank, the name of the law will be used instead."), AllowNull]
+        [Eco, LocDescription("A custom name for the payment. If left blank, the name of the law will be used instead."), AllowNullInView]
         public string PaymentCode { get; set; }
 
         [Eco, LocDescription("If true, no notification will be published at all when the payment is applied. Will still notify when the actual transaction occurs. Useful for high-frequency events like placing blocks or emitting pollution.")]
