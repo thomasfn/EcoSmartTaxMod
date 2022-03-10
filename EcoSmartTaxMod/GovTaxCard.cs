@@ -29,11 +29,12 @@ namespace Eco.Mods.SmartTax
         public static GovTaxCard GetOrCreateForAccount(GovernmentBankAccount account)
         {
             var registrar = Registrars.Get<GovTaxCard>();
-            var taxCard = registrar.All().Cast<GovTaxCard>().SingleOrDefault(t => t.Account == account);
+            var taxCard = registrar.FirstOrDefault(t => t.Account == account);
             if (taxCard != null) { return taxCard; }
-            taxCard = registrar.Add() as GovTaxCard;
+            taxCard = registrar.Add();
             taxCard.Account = account;
             taxCard.Name = $"{account.Name}'s Tax Card";
+            registrar.Save();
             return taxCard;
         }
 

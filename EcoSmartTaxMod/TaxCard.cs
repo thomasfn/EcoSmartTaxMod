@@ -98,11 +98,12 @@ namespace Eco.Mods.SmartTax
         public static TaxCard GetOrCreateForUser(User user)
         {
             var registrar = Registrars.Get<TaxCard>();
-            var taxCard = registrar.All().Cast<TaxCard>().SingleOrDefault(t => t.Creator == user);
+            var taxCard = registrar.FirstOrDefault(t => t.Creator == user);
             if (taxCard != null) { return taxCard; }
-            taxCard = registrar.Add() as TaxCard;
+            taxCard = registrar.Add();
             taxCard.Creator = user;
             taxCard.Name = $"{user.Name}'s Tax Card";
+            registrar.Save();
             return taxCard;
         }
 
