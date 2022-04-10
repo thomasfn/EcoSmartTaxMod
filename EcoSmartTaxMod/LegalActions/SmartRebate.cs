@@ -23,7 +23,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Players;
 
     [Eco, LocCategory("Finance"), CreateComponentTab("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Rebate"), LocDescription("Issues a rebate which is used to forgive some amount of future or present tax debt.")]
-    public class SmartRebate_LegalAction : LegalAction, ICustomValidity
+    public class SmartRebate_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
     {
         [Eco, LocDescription("Rebates taxes towards this account. Only Government Accounts are allowed."), TaxDestinationsOnly]
         public GameValue<BankAccount> TargetBankAccount { get; set; } = Make.Treasury;
@@ -46,7 +46,7 @@ namespace Eco.Mods.SmartTax
         public override LocString Description()
             => Localizer.Do($"Issue rebate of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
-        //PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
+        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
 
         private PostResult Do(LocString description, IContextObject context, Law law)
