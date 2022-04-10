@@ -23,7 +23,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Players;
 
     [Eco, LocCategory("Finance"), CreateComponentTab("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Tax"), LocDescription("A smarter tax that applies rebates, tracks debt and aggregates transactions.")]
-    public class SmartTax_LegalAction : LegalAction, ICustomValidity
+    public class SmartTax_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
     {
         [Eco, LocDescription("Where the money goes. Only Government Accounts are allowed."), TaxDestinationsOnly]
         public GameValue<BankAccount> TargetBankAccount { get; set; } = Make.Treasury;
@@ -53,7 +53,7 @@ namespace Eco.Mods.SmartTax
             => $"suspended when {this.Suspended.DescribeNullSafe()}";
 
         protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
-        //PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
+        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
 
         private PostResult Do(LocString description, IContextObject context, Law law)
