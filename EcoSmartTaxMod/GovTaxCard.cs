@@ -29,11 +29,12 @@ namespace Eco.Mods.SmartTax
         public static GovTaxCard GetOrCreateForAccount(GovernmentBankAccount account)
         {
             var registrar = Registrars.Get<GovTaxCard>();
-            var taxCard = registrar.All().Cast<GovTaxCard>().SingleOrDefault(t => t.Account == account);
+            var taxCard = registrar.FirstOrDefault(t => t.Account == account);
             if (taxCard != null) { return taxCard; }
-            taxCard = registrar.Add() as GovTaxCard;
+            taxCard = registrar.Add();
             taxCard.Account = account;
             taxCard.Name = $"{account.Name}'s Tax Card";
+            registrar.Save();
             return taxCard;
         }
 
@@ -57,7 +58,8 @@ namespace Eco.Mods.SmartTax
             player.OpenInfoPanel(Localizer.Do($"Report for {this.UILink()}"), $"{Report.DescriptionNoAccount}", "BankTransactions");
         }
 
-        public override void OnLinkClicked(TooltipContext context) => OpenReport(context.Player);
+        public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenReport(context.Player);
+
         public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view report.");
         public override LocString UILinkContent() => TextLoc.ItemIcon("Tax", Localizer.DoStr(this.Name));
 
