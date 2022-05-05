@@ -211,7 +211,7 @@ The tax card is stored in the game save along with all other objects such as ban
 
 ### Linux
 
-1. Run `ECO_BRANCH="staging" MODKIT_VERSION="0.9.5.0-beta-staging-2230" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
+1. Run `ECO_BRANCH="release" MODKIT_VERSION="0.9.5.0-beta" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
 2. Enter the `EcoSmartTaxMod` directory and run:
 `dotnet restore`
 `dotnet build`
