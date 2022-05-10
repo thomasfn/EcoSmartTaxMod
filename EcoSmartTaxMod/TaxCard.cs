@@ -179,7 +179,7 @@ namespace Eco.Mods.SmartTax
         }
 
         public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenTaxLog(context.Player);
-        public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view log.");
+        //public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view log.");
         public override LocString UILinkContent() => TextLoc.ItemIcon("Tax", Localizer.DoStr(this.Name));
 
         public float GetDebtSum(Func<TaxDebt, bool> predicate)
