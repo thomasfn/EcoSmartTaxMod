@@ -44,7 +44,7 @@ namespace Eco.Mods.SmartTax
 
         public override string ToString() => this.CachedString;
 
-        public static string BuildString(string time, string targetAccount, string taxCode, string description) => Text.Columns(30, (time, 150), (targetAccount, 390), (taxCode, 180), (description, 1200));
+        public static string BuildString(string time, string targetAccount, string taxCode, string description) => Text.Columns(30, 1, (time, 150), (targetAccount, 390), (taxCode, 180), (description, 1200));
 
     }
 
