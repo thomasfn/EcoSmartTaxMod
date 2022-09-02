@@ -9,14 +9,14 @@ jobs:
   build-mod:
     runs-on: ubuntu-latest
     env:
-      MODKIT_VERSION: 0.9.5.0-beta
+      MODKIT_VERSION: 0.9.6.1-beta
       ECO_BRANCH: release
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 5.0
+    - name: Setup .NET Core 6.0
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: '5.0.x'
+        dotnet-version: '6.0.x'
     - name: Fetch dependencies
       run: dotnet restore ./EcoSmartTaxMod/EcoSmartTaxMod.csproj
       env:
@@ -38,4 +38,4 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: mod-binaries-staging
-        path: EcoSmartTaxMod/bin/Release/net5.0/EcoSmartTaxMod.*
+        path: EcoSmartTaxMod/bin/Release/net6.0/EcoSmartTaxMod.*

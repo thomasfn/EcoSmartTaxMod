@@ -30,19 +30,19 @@ namespace Eco.Mods.SmartTax
             if (intervalStart?.Val == null)
             {
                 successInterval = default;
-                failEval = this.FailNullSafeFloat(intervalStart, nameof(this.IntervalStart));
+                failEval = this.FailNullSafe<float, float>(intervalStart, nameof(this.IntervalStart));
                 return false;
             }
             if (intervalEnd?.Val == null)
             {
                 successInterval = default;
-                failEval = this.FailNullSafeFloat(intervalEnd, nameof(this.IntervalEnd));
+                failEval = this.FailNullSafe<float, float>(intervalEnd, nameof(this.IntervalEnd));
                 return false;
             }
             if (intervalRelative?.Val == null)
             {
                 successInterval = default;
-                failEval = this.FailNullSafeFloat(intervalRelative, nameof(this.IntervalRelative));
+                failEval = this.FailNullSafe<float, bool>(intervalRelative, nameof(this.IntervalRelative));
                 return false;
             }
 
