@@ -61,7 +61,7 @@ namespace Eco.Mods.SmartTax
         public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenReport(context.Player);
 
         //public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view report.");
-        public override LocString UILinkContent() => TextLoc.ItemIcon("Tax", Localizer.DoStr(this.Name));
+        public override LocString UILinkContent() => TextLoc.Icon("Tax", Localizer.DoStr(this.Name));
 
         [Tooltip(100)]
         public override LocString Description()
