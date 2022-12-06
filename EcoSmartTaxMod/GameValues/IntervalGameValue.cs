@@ -17,8 +17,8 @@ namespace Eco.Mods.SmartTax
     [Eco]
     public abstract class IntervalGameValue : GameValue<float>
     {
-        [Eco, LocDescription("If relative, the number of days in the past. If not, the number of days from the beginning.")] public GameValue<float> IntervalStart { get; set; } = Make.GameValue(0.0f);
-        [Eco, LocDescription("If relative, the number of days in the past. If not, the number of days from the beginning.")] public GameValue<float> IntervalEnd { get; set; } = Make.GameValue(0.0f);
+        [Eco, LocDescription("If relative, the number of days in the past. If not, the number of days from the beginning.")] public GameValue<float> IntervalStart { get; set; } = MakeGameValue.GameValue(0.0f);
+        [Eco, LocDescription("If relative, the number of days in the past. If not, the number of days from the beginning.")] public GameValue<float> IntervalEnd { get; set; } = MakeGameValue.GameValue(0.0f);
         [Eco, LocDescription("If yes, the interval period will be relative to now. If no, they will be relative to day 0.")] public GameValue<bool> IntervalRelative { get; set; } = new Yes();
 
         protected bool EvaluateInterval(IContextObject action, out Reports.ReportInterval successInterval, out Eval<float> failEval)

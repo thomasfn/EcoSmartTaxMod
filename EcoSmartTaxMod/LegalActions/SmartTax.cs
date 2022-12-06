@@ -26,13 +26,13 @@ namespace Eco.Mods.SmartTax
     public class SmartTax_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
     {
         [Eco, LocDescription("Where the money goes. Only Government Accounts are allowed."), TaxDestinationsOnly]
-        public GameValue<BankAccount> TargetBankAccount { get; set; } = Make.Treasury;
+        public GameValue<BankAccount> TargetBankAccount { get; set; } = MakeGameValue.Treasury;
 
         [Eco, Advanced, LocDescription("Which currency to collect the tax in.")]
         public GameValue<Currency> Currency { get; set; }
 
         [Eco, LocDescription("The amount that is going to be taxed.")]
-        public GameValue<float> Amount { get; set; } = Make.GameValue(0f);
+        public GameValue<float> Amount { get; set; } = MakeGameValue.GameValue(0f);
 
         [Eco, Advanced, LocDescription("The player or group to tax.")]
         public GameValue<IAlias> Target { get; set; }
