@@ -22,7 +22,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
 
-    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), LocDescription("A smarter payment that tracks credit if the payer can't afford it.")]
+    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), HasIcon("Pay_LegalAction"), LocDescription("A smarter payment that tracks credit if the payer can't afford it.")]
     public class SmartPay_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
     {
         [Eco, LocDescription("Where the money comes from. Only Government Accounts are allowed."), TaxDestinationsOnly]
