@@ -19,11 +19,14 @@ namespace Eco.Mods.SmartTax
     [Serialized]
     public abstract class TaxEvent
     {
+        private const int CurrentCacheVersion = 1;
+
         [Serialized] public double Time { get; set; }
         [Serialized] public BankAccount SourceOrTargetAccount { get; set; }
         [Serialized] public string TaxOrPaymentCode { get; set; }
         [Serialized] public string Description { get; set; }
         [Serialized] public string CachedString { get; private set; }
+        [Serialized] public int CachedStringVersion { get; private set; }
 
         public TaxEvent() { }
         public TaxEvent(BankAccount sourceOrTargetAccount, string taxOrPaymentCode, string description)
@@ -34,17 +37,31 @@ namespace Eco.Mods.SmartTax
             this.Description = description;
             this.SourceOrTargetAccount = sourceOrTargetAccount;
 
+            RebuildCachedString();
+        }
+
+        protected virtual void RebuildCachedString()
+        {
             this.CachedString = BuildString(
                 TimeFormatter.FormatSpan(this.Time),
                 this.SourceOrTargetAccount.UILink(),
                 this.TaxOrPaymentCode ?? "",
                 this.Description
             );
+            this.CachedStringVersion = CurrentCacheVersion;
         }
 
-        public override string ToString() => this.CachedString;
+        public override string ToString()
+        {
+            if (CachedStringVersion != CurrentCacheVersion || string.IsNullOrEmpty(this.CachedString))
+            {
+                RebuildCachedString();
+            }
+            return this.CachedString;
+        }
 
-        public static string BuildString(string time, string targetAccount, string taxCode, string description) => Text.Columns(30, 1, (time, 150), (targetAccount, 390), (taxCode, 180), (description, 1200));
+        public static string BuildString(string time, string targetAccount, string taxCode, string description)
+            => Text.Columns(2, Transaction.EmBaseSize, (time, 8), (targetAccount, 20), (taxCode, 20), (description, 72));
 
     }
 
@@ -240,7 +257,7 @@ namespace Eco.Mods.SmartTax
             {
 
                 foreach (var taxEvent in this.Events.Reverse().Prepend(HeadEvent))
-                    sb.AppendLine(taxEvent.CachedString);
+                    sb.AppendLine(taxEvent.ToString());
 
             }
 
