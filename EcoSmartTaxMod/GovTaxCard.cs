@@ -6,25 +6,28 @@ namespace Eco.Mods.SmartTax
 {
     using Core.Controller;
     using Core.Systems;
-    using Core.Utils;
 
     using Gameplay.Utils;
     using Gameplay.Systems.Tooltip;
-    using Gameplay.Players;
     using Gameplay.Systems.TextLinks;
+    using Gameplay.Systems.NewTooltip;
+    using Gameplay.Players;
     using Gameplay.Economy;
-    using Gameplay.GameActions;
+    using Gameplay.Items;
+    
 
     using Shared.Serialization;
     using Shared.Localization;
-    using Eco.Shared.Services;
+    using Shared.Items;
 
     [Serialized, ForceCreateView]
-    public class GovTaxCard : SimpleEntry
+    public class GovTaxCard : SimpleEntry, IHasIcon
     {
         [Serialized] public GovernmentBankAccount Account { get; set; }
 
         [Serialized, NotNull] public Reports.Report Report { get; private set; } = new Reports.Report();
+
+        public override string IconName => $"Tax";
 
         public static GovTaxCard GetOrCreateForAccount(GovernmentBankAccount account)
         {
@@ -60,11 +63,9 @@ namespace Eco.Mods.SmartTax
 
         public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenReport(context.Player);
 
-        //public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view report.");
-        public override LocString UILinkContent() => TextLoc.Icon("Tax", Localizer.DoStr(this.Name));
 
-        [Tooltip(100)]
-        public override LocString Description()
+        [NewTooltip(CacheAs.Disabled, 100)]
+        public LocString Tooltip()
             => Report.TotalReport.Description;
     }
 }

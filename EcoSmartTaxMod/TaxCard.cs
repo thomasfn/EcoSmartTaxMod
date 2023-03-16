@@ -10,14 +10,18 @@ namespace Eco.Mods.SmartTax
 
     using Gameplay.Utils;
     using Gameplay.Systems.Tooltip;
-    using Gameplay.Players;
     using Gameplay.Systems.TextLinks;
+    using Gameplay.Systems.NewTooltip;
+    using Gameplay.Players;
     using Gameplay.Economy;
     using Gameplay.GameActions;
+    using Gameplay.Items;
 
     using Shared.Serialization;
     using Shared.Localization;
-    using Eco.Shared.Services;
+    using Shared.Services;
+    using Shared.Items;
+    using Eco.Shared.IoC;
 
     [Serialized]
     public class TaxDebt
@@ -83,7 +87,7 @@ namespace Eco.Mods.SmartTax
     }
 
     [Serialized, ForceCreateView]
-    public class TaxCard : SimpleEntry
+    public class TaxCard : SimpleEntry, IHasIcon
     {
         [Serialized, NotNull] public ThreadSafeList<TaxDebt> TaxDebts { get; private set; } = new ThreadSafeList<TaxDebt>();
 
@@ -94,6 +98,8 @@ namespace Eco.Mods.SmartTax
         [Serialized, NotNull] public TaxLog TaxLog { get; private set; } = new TaxLog();
 
         [Serialized, NotNull] public Reports.Report Report { get; private set; } = new Reports.Report();
+
+        public override string IconName => $"Tax";
 
         public static TaxCard GetOrCreateForUser(User user)
         {
@@ -179,8 +185,6 @@ namespace Eco.Mods.SmartTax
         }
 
         public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenTaxLog(context.Player);
-        //public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view log.");
-        public override LocString UILinkContent() => TextLoc.Icon("Tax", Localizer.DoStr(this.Name));
 
         public float GetDebtSum(Func<TaxDebt, bool> predicate)
             => TaxDebts
@@ -221,7 +225,8 @@ namespace Eco.Mods.SmartTax
         }
            
 
-        [Tooltip(100)] public override LocString Description()
+        [NewTooltip(CacheAs.Instance, 100)]
+        public LocString Tooltip()
             => Localizer.Do($"Owes {DebtSummary()}, due {CreditSummary()}.\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}");
 
         public LocString DescribeDebts()
@@ -258,6 +263,7 @@ namespace Eco.Mods.SmartTax
             CheckInvalidAccounts();
 
             var pack = new GameActionPack();
+            bool didWork = false;
 
             // Iterate debts, smallest first, try to cancel out with rebates
             var debts = TaxDebts
@@ -265,7 +271,7 @@ namespace Eco.Mods.SmartTax
                 .ToArray();
             foreach (var taxDebt in debts)
             {
-                TickDebtRebates(taxDebt);
+                didWork |= TickDebtRebates(taxDebt);
             }
 
             // Now iterate payments, smallest first, try to cancel out with taxes left after rebate, otherwise try to pay
@@ -274,7 +280,7 @@ namespace Eco.Mods.SmartTax
                 .ToArray();
             foreach (var paymentCredit in payments)
             {
-                TickPayment(paymentCredit, pack);
+                didWork |= TickPayment(paymentCredit, pack);
             }
 
             // Now iterate debts again, smallest first, try to collect
@@ -283,8 +289,10 @@ namespace Eco.Mods.SmartTax
                 .ToArray();
             foreach (var taxDebt in debts)
             {
-                TickDebt(taxDebt, pack);
+                didWork |= TickDebt(taxDebt, pack);
             }
+
+            if (didWork) { ServiceHolder<ITooltipSubscriptions>.Obj.MarkTooltipPartDirty(nameof(Tooltip), instance: this); }
 
             if (pack.Empty) { return; }
 
@@ -294,7 +302,6 @@ namespace Eco.Mods.SmartTax
             {
                 Logger.Error($"Failed to perform GameActionPack with tax transfers: {result.Message}");
             }
-            this.Changed(nameof(Description));
         }
 
         private void CheckInvalidAccounts()
@@ -330,7 +337,7 @@ namespace Eco.Mods.SmartTax
         /// Does not generate any transactions, may generate tax events.
         /// </summary>
         /// <param name="taxDebt"></param>
-        private void TickDebtRebates(TaxDebt taxDebt)
+        private bool TickDebtRebates(TaxDebt taxDebt)
         {
             // Find any rebates to work down the debt, smallest first
             var taxRebates = TaxRebates
@@ -350,7 +357,7 @@ namespace Eco.Mods.SmartTax
                     {
                         TaxRebates.Remove(taxRebate);
                     }
-                    return;
+                    return true;
                 }
                 // The rebate covers the debt partially
                 TaxLog.AddTaxEvent(new SettlementEvent(taxRebate, true, taxDebt));
@@ -361,8 +368,9 @@ namespace Eco.Mods.SmartTax
             if (taxDebt.Amount < Transfers.AlmostZero)
             {
                 TaxDebts.Remove(taxDebt);
-                return;
+                return true;
             }
+            return false;
         }
 
         /// <summary>
@@ -371,13 +379,14 @@ namespace Eco.Mods.SmartTax
         /// </summary>
         /// <param name="paymentCredit"></param>
         /// <param name="pack"></param>
-        private void TickPayment(PaymentCredit paymentCredit, GameActionPack pack)
+        private bool TickPayment(PaymentCredit paymentCredit, GameActionPack pack)
         {
             // Find any taxes that we can use the payment to pay off, smallest first
             var taxDebts = TaxDebts
                 .Where(taxDebt => taxDebt.TargetAccount == paymentCredit.SourceAccount && taxDebt.Currency == paymentCredit.Currency)
                 .OrderBy(taxDebt => taxDebt.Amount)
                 .ToArray();
+            bool didAffectTaxDebt = false;
             foreach (var taxDebt in taxDebts)
             {
                 if (paymentCredit.Amount >= taxDebt.Amount)
@@ -387,6 +396,7 @@ namespace Eco.Mods.SmartTax
                     paymentCredit.Amount -= taxDebt.Amount;
                     taxDebt.Amount = 0.0f;
                     TaxDebts.Remove(taxDebt);
+                    didAffectTaxDebt = true;
                     if (paymentCredit.Amount < Transfers.AlmostZero)
                     {
                         break;
@@ -399,13 +409,13 @@ namespace Eco.Mods.SmartTax
                     taxDebt.Amount -= paymentCredit.Amount;
                     paymentCredit.Amount = 0.0f;
                     PaymentCredits.Remove(paymentCredit);
-                    return;
+                    return true;
                 }
             }
             if (paymentCredit.Amount < Transfers.AlmostZero)
             {
                 PaymentCredits.Remove(paymentCredit);
-                return;
+                return true;
             }
 
             // Check how much money is available to pay them
@@ -417,6 +427,7 @@ namespace Eco.Mods.SmartTax
                 Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
                 paymentCredit.Amount = 0.0f;
                 PaymentCredits.Remove(paymentCredit);
+                return true;
             }
             else if (availableAmount > Transfers.AlmostZero)
             {
@@ -424,7 +435,10 @@ namespace Eco.Mods.SmartTax
                 TaxLog.AddTaxEvent(new PaymentEvent(availableAmount, paymentCredit));
                 Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
                 paymentCredit.Amount -= availableAmount;
+                return true;
             }
+
+            return didAffectTaxDebt;
         }
 
         /// <summary>
@@ -433,10 +447,10 @@ namespace Eco.Mods.SmartTax
         /// </summary>
         /// <param name="taxDebt"></param>
         /// <param name="pack"></param>
-        private void TickDebt(TaxDebt taxDebt, GameActionPack pack)
+        private bool TickDebt(TaxDebt taxDebt, GameActionPack pack)
         {
             // If it's suspended, don't try and collect yet
-            if (taxDebt.Suspended) { return; }
+            if (taxDebt.Suspended) { return false; }
 
             // Get their current wealth in the debt's currency
             var accounts = Transfers.GetTaxableAccountsForUser(Creator, taxDebt.Currency);
@@ -456,6 +470,7 @@ namespace Eco.Mods.SmartTax
                 Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), taxDebt.Amount));
                 taxDebt.Amount = 0.0f;
                 TaxDebts.Remove(taxDebt);
+                return true;
             }
             else if (total > Transfers.AlmostZero)
             {
@@ -463,11 +478,13 @@ namespace Eco.Mods.SmartTax
                 TaxLog.AddTaxEvent(new CollectionEvent(total, taxDebt));
                 Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), total));
                 taxDebt.Amount -= total;
+                return true;
             }
+            return false;
         }
 
         /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
-        private TransferData CreateTaxTransferData(User taxPayer, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
+        private static TransferData CreateTaxTransferData(User taxPayer, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
         {
             Receiver = taxPayer,                     // For taxes this guy's accounts will be targeted.
             TaxableAmount = amount,    // For pure taxes we set TaxableAmount instead of Amount.
@@ -489,7 +506,7 @@ namespace Eco.Mods.SmartTax
         };
 
         /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
-        private TransferData CreatePaymentTransferData(User paymentReceiver, BankAccount sourceAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
+        private static TransferData CreatePaymentTransferData(User paymentReceiver, BankAccount sourceAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
         {
             Receiver = paymentReceiver,
             TaxableAmount = 0.0f,
