@@ -297,7 +297,7 @@ namespace Eco.Mods.SmartTax
             if (pack.Empty) { return; }
 
             // Perform action
-            var result = pack.TryPerform();
+            var result = pack.TryPerform(null);
             if (result.Failed)
             {
                 Logger.Error($"Failed to perform GameActionPack with tax transfers: {result.Message}");
