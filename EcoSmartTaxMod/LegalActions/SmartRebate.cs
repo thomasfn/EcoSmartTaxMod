@@ -22,7 +22,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
 
-    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Rebate"), HasIcon("Tax_LegalAction"), LocDescription("Issues a rebate which is used to forgive some amount of future or present tax debt.")]
+    [Eco, LocCategory("Finance"), CreateComponentTabLoc("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Rebate"), HasIcon("Tax_LegalAction"), LocDescription("Issues a rebate which is used to forgive some amount of future or present tax debt.")]
     public class SmartRebate_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
     {
         [Eco, LocDescription("Rebates taxes towards this account. Only Government Accounts are allowed."), TaxDestinationsOnly]
