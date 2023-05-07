@@ -6,6 +6,7 @@ namespace Eco.Mods.SmartTax.Reports
     using Core.Utils;
 
     using Gameplay.Economy;
+    using Gameplay.Economy.Transfer;
 
     using Shared.Serialization;
     using Shared.Localization;

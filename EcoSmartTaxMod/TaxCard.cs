@@ -14,6 +14,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Systems.NewTooltip;
     using Gameplay.Players;
     using Gameplay.Economy;
+    using Gameplay.Economy.Transfer;
     using Gameplay.GameActions;
     using Gameplay.Items;
 
@@ -21,7 +22,7 @@ namespace Eco.Mods.SmartTax
     using Shared.Localization;
     using Shared.Services;
     using Shared.Items;
-    using Eco.Shared.IoC;
+    using Shared.IoC;
 
     [Serialized]
     public class TaxDebt
