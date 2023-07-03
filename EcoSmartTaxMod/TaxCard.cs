@@ -17,6 +17,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Economy.Transfer;
     using Gameplay.GameActions;
     using Gameplay.Items;
+    using Gameplay.Settlements;
 
     using Shared.Serialization;
     using Shared.Localization;
@@ -425,7 +426,8 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be fully paid
                 TaxLog.AddTaxEvent(new PaymentEvent(paymentCredit.Amount, paymentCredit));
-                Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
+                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
+                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (payment of {paymentCredit.Amount} {paymentCredit.Currency.Name} from {paymentCredit.SourceAccount.Name} to {Creator.Name}) - {result}"); }
                 paymentCredit.Amount = 0.0f;
                 PaymentCredits.Remove(paymentCredit);
                 return true;
@@ -434,7 +436,8 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be partially paid
                 TaxLog.AddTaxEvent(new PaymentEvent(availableAmount, paymentCredit));
-                Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
+                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
+                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (payment of {paymentCredit.Amount} {paymentCredit.Currency.Name} from {paymentCredit.SourceAccount.Name} to {Creator.Name}) - {result}"); }
                 paymentCredit.Amount -= availableAmount;
                 return true;
             }
@@ -468,7 +471,8 @@ namespace Eco.Mods.SmartTax
             {
                 // Their balance covers the debt fully
                 TaxLog.AddTaxEvent(new CollectionEvent(taxDebt.Amount, taxDebt));
-                Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), taxDebt.Amount));
+                var result = Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), taxDebt.Amount));
+                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}"); }
                 taxDebt.Amount = 0.0f;
                 TaxDebts.Remove(taxDebt);
                 return true;
@@ -477,12 +481,17 @@ namespace Eco.Mods.SmartTax
             {
                 // Their balance covers the debt partially
                 TaxLog.AddTaxEvent(new CollectionEvent(total, taxDebt));
-                Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), total));
+                var result = Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), total));
+                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}"); }
                 taxDebt.Amount -= total;
                 return true;
             }
             return false;
         }
+
+        private static Settlement GetSettlementForAccount(BankAccount bankAccount)
+            => Registrars.Get<Settlement>()
+                .FirstOrDefault(x => x.TreasuryBankAccount == bankAccount);
 
         /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
         private static TransferData CreateTaxTransferData(User taxPayer, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
@@ -499,11 +508,14 @@ namespace Eco.Mods.SmartTax
             // Shared defaults (always the same).
             Currency = currency,
             TransferDescription = transactionDescription,
+            // AmountDescription
+            // HideAmount
             TransferAsMuchAsPossible = true, // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
             UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
             SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
             IsFundsAllocation = false,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
             Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
+            Location = GetSettlementForAccount(targetAccount)?.Position ?? null,
         };
 
         /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
@@ -521,11 +533,14 @@ namespace Eco.Mods.SmartTax
             // Shared defaults (always the same).
             Currency = currency,
             TransferDescription = transactionDescription,
+            // AmountDescription
+            // HideAmount
             TransferAsMuchAsPossible = true,  // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
             UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
             SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
             IsFundsAllocation = true,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
             Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
+            Location = GetSettlementForAccount(sourceAccount)?.Position ?? null,
         };
 
     }
