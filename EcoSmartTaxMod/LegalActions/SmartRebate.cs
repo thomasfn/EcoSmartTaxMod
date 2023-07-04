@@ -21,6 +21,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Aliases;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
+    using Gameplay.Settlements;
 
     [Eco, LocCategory("Finance"), CreateComponentTabLoc("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Rebate"), HasIcon("Tax_LegalAction"), LocDescription("Issues a rebate which is used to forgive some amount of future or present tax debt.")]
     public class SmartRebate_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
@@ -60,31 +61,37 @@ namespace Eco.Mods.SmartTax
 
             if (currency == null) { return new PostResult($"Transfer currency must be set.", true); }
             if (targetBankAccount == null) { return new PostResult($"Target bank account must be set.", true); }
+            if (alias == null) { return new PostResult($"Rebate without target citizen skipped.", true); }
 
-            var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult($"Rebate without target citizen skipped.", true); }
+            var jurisdiction = Jurisdiction.FromContext(context, law);
+            if (!jurisdiction.TestAccount(targetBankAccount)) { return new PostResult($"{targetBankAccount.MarkedUpName} isn't a government account of {jurisdiction} or held by any of its citizens.", true); }
+            var users = jurisdiction.GetAllowedUsersFromTarget(context, alias, out var jurisdictionDescription, "rebated");
+            if (!users.Any()) { return new PostResult(jurisdictionDescription, true); }
 
             if (silent)
             {
                 return new PostResult(() =>
                 {
-                    RecordRebateForUsers(users, targetBankAccount, currency, rebateCode, amount);
+                    RecordRebateForUsers(jurisdiction.Settlement, users, targetBankAccount, currency, rebateCode, amount);
                 });
             }
             return new PostResult(() =>
             {
-                RecordRebateForUsers(users, targetBankAccount, currency, rebateCode, amount);
-                return Localizer.Do($"Issuing rebate of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({rebateCode})");
+                RecordRebateForUsers(jurisdiction.Settlement, users, targetBankAccount, currency, rebateCode, amount);
+                return Localizer.Do($"Issuing rebate of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {DescribeTarget(jurisdiction, targetBankAccount)} ({rebateCode})");
             });
         }
 
-        private void RecordRebateForUsers(IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string rebateCode, float amount)
+        private void RecordRebateForUsers(Settlement settlement, IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string rebateCode, float amount)
         {
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordRebate(targetBankAccount, currency, rebateCode, amount);
+                taxCard.RecordRebate(settlement, targetBankAccount, currency, rebateCode, amount);
             }
         }
+
+        private static LocString DescribeTarget(Jurisdiction jurisdiction, BankAccount targetAccount)
+            => jurisdiction.IsGlobal ? targetAccount.UILink() : Localizer.Do($"{jurisdiction.Settlement.UILinkNullSafe()} ({targetAccount.UILink()})");
     }
 }

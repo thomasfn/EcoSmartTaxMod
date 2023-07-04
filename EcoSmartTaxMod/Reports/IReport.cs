@@ -2,8 +2,7 @@
 
 namespace Eco.Mods.SmartTax.Reports
 {
-    using Core.Utils;
-
+    using Gameplay.Settlements;
     using Gameplay.Economy;
 
     using Shared.Localization;
@@ -14,10 +13,10 @@ namespace Eco.Mods.SmartTax.Reports
 
         LocString DescriptionNoAccount { get; }
 
-        void RecordTax(BankAccount targetAccount, Currency currency, string taxCode, float amount);
+        void RecordTax(Settlement settlement, BankAccount targetAccount, Currency currency, string taxCode, float amount);
 
-        void RecordPayment(BankAccount sourceAccount, Currency currency, string paymentCode, float amount);
+        void RecordPayment(Settlement settlement, BankAccount sourceAccount, Currency currency, string paymentCode, float amount);
 
-        void RecordRebate(BankAccount targetAccount, Currency currency, string rebateCode, float amount);
+        void RecordRebate(Settlement settlement, BankAccount targetAccount, Currency currency, string rebateCode, float amount);
     }
 }

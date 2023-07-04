@@ -21,6 +21,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Aliases;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
+    using Gameplay.Settlements;
 
     [Eco, LocCategory("Finance"), CreateComponentTabLoc("Smart Pay", IconName = "Pay"), LocDisplayName("Smart Pay"), HasIcon("Pay_LegalAction"), LocDescription("A smarter payment that tracks credit if the payer can't afford it.")]
     public class SmartPay_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
@@ -60,31 +61,37 @@ namespace Eco.Mods.SmartTax
 
             if (currency == null) { return new PostResult($"Transfer currency must be set.", true); }
             if (sourceBankAccount == null) { return new PostResult($"Source bank account must be set.", true); }
+            if (alias == null) { return new PostResult($"Payment without target citizen skipped.", true); }
 
-            var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult($"Payment without target citizen skipped.", true); }
+            var jurisdiction = Jurisdiction.FromContext(context, law);
+            if (!jurisdiction.TestAccount(sourceBankAccount)) { return new PostResult($"{sourceBankAccount.MarkedUpName} isn't a government account of {jurisdiction} or held by any of its citizens.", true); }
+            var users = jurisdiction.GetAllowedUsersFromTarget(context, alias, out var jurisdictionDescription, "paid");
+            if (!users.Any()) { return new PostResult(jurisdictionDescription, true); }
 
             if (silent)
             {
                 return new PostResult(() =>
                 {
-                    RecordPaymentForUsers(users, sourceBankAccount, currency, paymentCode, amount);
+                    RecordPaymentForUsers(jurisdiction.Settlement, users, sourceBankAccount, currency, paymentCode, amount);
                 });
             }
             return new PostResult(() =>
             {
-                RecordPaymentForUsers(users, sourceBankAccount, currency, paymentCode, amount);
-                return Localizer.Do($"Issuing payment of {currency.UILinkContent(amount)} from {sourceBankAccount.UILink()} to {alias.UILinkGeneric()} ({paymentCode})");
+                RecordPaymentForUsers(jurisdiction.Settlement, users, sourceBankAccount, currency, paymentCode, amount);
+                return Localizer.Do($"Issuing payment of {currency.UILinkContent(amount)} from {DescribeSource(jurisdiction, sourceBankAccount)} to {alias.UILinkGeneric()} ({paymentCode})");
             });
         }
 
-        private void RecordPaymentForUsers(IEnumerable<User> users, BankAccount sourceBankAccount, Currency currency, string paymentCode, float amount)
+        private void RecordPaymentForUsers(Settlement settlement, IEnumerable<User> users, BankAccount sourceBankAccount, Currency currency, string paymentCode, float amount)
         {
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordPayment(sourceBankAccount, currency, paymentCode, amount);
+                taxCard.RecordPayment(settlement, sourceBankAccount, currency, paymentCode, amount);
             }
         }
+
+        private static LocString DescribeSource(Jurisdiction jurisdiction, BankAccount sourceAccount)
+            => jurisdiction.IsGlobal ? sourceAccount.UILink() : Localizer.Do($"{jurisdiction.Settlement.UILinkNullSafe()} ({sourceAccount.UILink()})");
     }
 }

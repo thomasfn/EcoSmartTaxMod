@@ -28,6 +28,8 @@ namespace Eco.Mods.SmartTax
     [Serialized]
     public class TaxDebt
     {
+        [Serialized] public Settlement Settlement { get; set; }
+
         [Serialized] public BankAccount TargetAccount { get; set; }
 
         [Serialized] public Currency Currency { get; set; }
@@ -38,11 +40,17 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public bool Suspended { get; set; }
 
+        private LocString TargetDescription
+            => Settlement != null ? Localizer.Do($"{Settlement.UILink()} ({TargetAccount.UILink()})") : TargetAccount.UILink();
+
         public LocString Description
-            => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} to {TargetAccount.UILink()} ({TaxCode}){(Suspended ? " (suspended)" :"")}");
+            => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} to {TargetDescription} ({TaxCode}){(Suspended ? " (suspended)" :"")}");
+
+        public LocString DescriptionNoAccount
+            => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} ({TaxCode}){(Suspended ? " (suspended)" : "")}");
 
         public LocString ReportDescription
-            => Localizer.Do($"Tax ({TaxCode}) of {Currency.UILinkContent(Amount)} (to {TargetAccount.UILink()})");
+            => Localizer.Do($"Tax ({TaxCode}) of {Currency.UILinkContent(Amount)} (to {TargetDescription})");
 
         public LocString ReportDescriptionNoAccount
             => Localizer.Do($"Tax ({TaxCode}) of {Currency.UILinkContent(Amount)}");
@@ -51,6 +59,8 @@ namespace Eco.Mods.SmartTax
     [Serialized]
     public class TaxRebate
     {
+        [Serialized] public Settlement Settlement { get; set; }
+
         [Serialized] public BankAccount TargetAccount { get; set; }
 
         [Serialized] public Currency Currency { get; set; }
@@ -59,10 +69,17 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public float Amount { get; set; }
 
-        public LocString Description => Localizer.Do($"Rebate of {Currency.UILinkContent(Amount)} from {TargetAccount.UILink()} ({RebateCode})");
+        private LocString TargetDescription
+            => Settlement != null ? Localizer.Do($"{Settlement.UILink()} ({TargetAccount.UILink()})") : TargetAccount.UILink();
+
+        public LocString Description
+            => Localizer.Do($"Rebate of {Currency.UILinkContent(Amount)} from {TargetDescription} ({RebateCode})");
+
+        public LocString DescriptionNoAccount
+            => Localizer.Do($"Rebate of {Currency.UILinkContent(Amount)} ({RebateCode})");
 
         public LocString ReportDescription
-            => Localizer.Do($"Rebate ({RebateCode}) of {Currency.UILinkContent(Amount)} (to {TargetAccount.UILink()})");
+            => Localizer.Do($"Rebate ({RebateCode}) of {Currency.UILinkContent(Amount)} (from {TargetDescription})");
 
         public LocString ReportDescriptionNoAccount
             => Localizer.Do($"Rebate ({RebateCode}) of {Currency.UILinkContent(Amount)}");
@@ -71,6 +88,8 @@ namespace Eco.Mods.SmartTax
     [Serialized]
     public class PaymentCredit
     {
+        [Serialized] public Settlement Settlement { get; set; }
+
         [Serialized] public BankAccount SourceAccount { get; set; }
 
         [Serialized] public Currency Currency { get; set; }
@@ -79,10 +98,17 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public float Amount { get; set; }
 
-        public LocString Description => Localizer.Do($"Payment of {Currency.UILinkContent(Amount)} from {SourceAccount.UILink()} ({PaymentCode})");
+        private LocString SourceDescription
+            => Settlement != null ? Localizer.Do($"{Settlement.UILink()} ({SourceAccount.UILink()})") : SourceAccount.UILink();
+
+        public LocString Description
+            => Localizer.Do($"Payment of {Currency.UILinkContent(Amount)} from {SourceDescription} ({PaymentCode})");
+
+        public LocString DescriptionNoAccount
+            => Localizer.Do($"Payment of {Currency.UILinkContent(Amount)} ({PaymentCode})");
 
         public LocString ReportDescription
-            => Localizer.Do($"Payment ({PaymentCode}) of {Currency.UILinkContent(Amount)} (from {SourceAccount.UILink()})");
+            => Localizer.Do($"Payment ({PaymentCode}) of {Currency.UILinkContent(Amount)} (from {SourceDescription})");
 
         public LocString ReportDescriptionNoAccount
             => Localizer.Do($"Payment ({PaymentCode}) of {Currency.UILinkContent(Amount)}");
@@ -115,12 +141,12 @@ namespace Eco.Mods.SmartTax
             return taxCard;
         }
 
-        public void RecordTax(BankAccount targetAccount, Currency currency, string taxCode, float amount, bool suspended)
+        public void RecordTax(Settlement settlement, BankAccount targetAccount, Currency currency, string taxCode, float amount, bool suspended)
         {
             if (amount < Transfers.AlmostZero) { return; }
             var taxEntry = TaxDebts.GetOrCreate(
-                taxEntry => taxEntry.TargetAccount == targetAccount && taxEntry.Currency == currency && taxEntry.TaxCode == taxCode,
-                () => new TaxDebt { TargetAccount = targetAccount, Currency = currency, TaxCode = taxCode, Amount = 0.0f, Suspended = suspended }
+                taxEntry => taxEntry.Settlement == settlement && taxEntry.TargetAccount == targetAccount && taxEntry.Currency == currency && taxEntry.TaxCode == taxCode,
+                () => new TaxDebt { Settlement = settlement, TargetAccount = targetAccount, Currency = currency, TaxCode = taxCode, Amount = 0.0f, Suspended = suspended }
             );
             if (!suspended)
             {
@@ -132,45 +158,45 @@ namespace Eco.Mods.SmartTax
                 taxEntry.Suspended = false;
             }
             taxEntry.Amount += amount;
-            TaxLog.AddTaxEvent(new RecordTaxEvent(targetAccount, taxCode, amount, currency));
-            Report.RecordTax(targetAccount, currency, taxCode, amount);
+            TaxLog.AddTaxEvent(new RecordTaxEvent(settlement, targetAccount, taxCode, amount, currency));
+            Report.RecordTax(settlement, targetAccount, currency, taxCode, amount);
             if (targetAccount is GovernmentBankAccount targetGovAccount)
             {
-                GovTaxCard.GetOrCreateForAccount(targetGovAccount).RecordTax(currency, taxCode, amount);
+                GovTaxCard.GetOrCreateForAccount(targetGovAccount).RecordTax(settlement, currency, taxCode, amount);
             }
             this.Changed(nameof(Description));
         }
 
-        public void RecordPayment(BankAccount sourceAccount, Currency currency, string paymentCode, float amount)
+        public void RecordPayment(Settlement settlement, BankAccount sourceAccount, Currency currency, string paymentCode, float amount)
         {
             if (amount < Transfers.AlmostZero) { return; }
             var paymentCredit = PaymentCredits.GetOrCreate(
-                taxEntry => taxEntry.SourceAccount == sourceAccount && taxEntry.Currency == currency && taxEntry.PaymentCode == paymentCode,
-                () => new PaymentCredit { SourceAccount = sourceAccount, Currency = currency, PaymentCode = paymentCode, Amount = 0.0f }
+                paymentCredit => paymentCredit.Settlement == settlement && paymentCredit.SourceAccount == sourceAccount && paymentCredit.Currency == currency && paymentCredit.PaymentCode == paymentCode,
+                () => new PaymentCredit { Settlement = settlement, SourceAccount = sourceAccount, Currency = currency, PaymentCode = paymentCode, Amount = 0.0f }
             );
             paymentCredit.Amount += amount;
-            TaxLog.AddTaxEvent(new RecordPaymentEvent(sourceAccount, paymentCode, amount, currency));
-            Report.RecordPayment(sourceAccount, currency, paymentCode, amount);
+            TaxLog.AddTaxEvent(new RecordPaymentEvent(settlement, sourceAccount, paymentCode, amount, currency));
+            Report.RecordPayment(settlement, sourceAccount, currency, paymentCode, amount);
             if (sourceAccount is GovernmentBankAccount sourceGovAccount)
             {
-                GovTaxCard.GetOrCreateForAccount(sourceGovAccount).RecordPayment(currency, paymentCode, amount);
+                GovTaxCard.GetOrCreateForAccount(sourceGovAccount).RecordPayment(settlement, currency, paymentCode, amount);
             }
             this.Changed(nameof(Description));
         }
 
-        public void RecordRebate(BankAccount targetAccount, Currency currency, string rebateCode, float amount)
+        public void RecordRebate(Settlement settlement, BankAccount targetAccount, Currency currency, string rebateCode, float amount)
         {
             if (amount < Transfers.AlmostZero) { return; }
             var taxRebate = TaxRebates.GetOrCreate(
-               taxRebate => taxRebate.TargetAccount == targetAccount && taxRebate.Currency == currency && taxRebate.RebateCode == rebateCode,
-               () => new TaxRebate { TargetAccount = targetAccount, Currency = currency, RebateCode = rebateCode, Amount = 0.0f }
+               taxRebate => taxRebate.Settlement == settlement && taxRebate.TargetAccount == targetAccount && taxRebate.Currency == currency && taxRebate.RebateCode == rebateCode,
+               () => new TaxRebate { Settlement = settlement, TargetAccount = targetAccount, Currency = currency, RebateCode = rebateCode, Amount = 0.0f }
             );
             taxRebate.Amount += amount;
-            TaxLog.AddTaxEvent(new RecordRebateEvent(targetAccount, rebateCode, amount, currency));
-            Report.RecordRebate(targetAccount, currency, rebateCode, amount);
+            TaxLog.AddTaxEvent(new RecordRebateEvent(settlement, targetAccount, rebateCode, amount, currency));
+            Report.RecordRebate(settlement, targetAccount, currency, rebateCode, amount);
             if (targetAccount is GovernmentBankAccount targetGovAccount)
             {
-                GovTaxCard.GetOrCreateForAccount(targetGovAccount).RecordRebate(currency, rebateCode, amount);
+                GovTaxCard.GetOrCreateForAccount(targetGovAccount).RecordRebate(settlement, currency, rebateCode, amount);
             }
             this.Changed(nameof(Description));
         }
@@ -426,7 +452,7 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be fully paid
                 TaxLog.AddTaxEvent(new PaymentEvent(paymentCredit.Amount, paymentCredit));
-                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
+                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.Settlement, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
                 if (!result.Success) { Logger.Debug($"Unexpected transfer fail (payment of {paymentCredit.Amount} {paymentCredit.Currency.Name} from {paymentCredit.SourceAccount.Name} to {Creator.Name}) - {result}"); }
                 paymentCredit.Amount = 0.0f;
                 PaymentCredits.Remove(paymentCredit);
@@ -436,7 +462,7 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be partially paid
                 TaxLog.AddTaxEvent(new PaymentEvent(availableAmount, paymentCredit));
-                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
+                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.Settlement, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
                 if (!result.Success) { Logger.Debug($"Unexpected transfer fail (payment of {paymentCredit.Amount} {paymentCredit.Currency.Name} from {paymentCredit.SourceAccount.Name} to {Creator.Name}) - {result}"); }
                 paymentCredit.Amount -= availableAmount;
                 return true;
@@ -456,53 +482,67 @@ namespace Eco.Mods.SmartTax
             // If it's suspended, don't try and collect yet
             if (taxDebt.Suspended) { return false; }
 
-            // Get their current wealth in the debt's currency
+            // Iterate their accounts, searching for funds to settle the debt
             var accounts = Transfers.GetTaxableAccountsForUser(Creator, taxDebt.Currency);
-            var total = 0.0f;
-            var totalAccounts = 0;
+            float amountToCollect = taxDebt.Amount;
+            float amountCollected = 0.0f;
             foreach (var account in accounts)
             {
                 var amount = account.GetCurrencyHoldingVal(taxDebt.Currency, Creator);
-                if (amount < Transfers.AlmostZero) continue;
-                totalAccounts++;
-                total += amount;
+                if (amount < Transfers.AlmostZero) { continue; }
+
+                if (amount >= amountToCollect)
+                {
+                    // The account balance covers the debt fully
+                    var result = Transfers.Transfer(pack, CreateTaxDirectTransferData(Creator, account, taxDebt.Settlement, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), amountToCollect));
+                    if (!result.Success)
+                    {
+                        Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}");
+                        continue;
+                    }
+                    amountCollected += amountToCollect;
+                    amountToCollect = 0.0f;
+                    break;
+                }
+                else if (amount > Transfers.AlmostZero)
+                {
+                    // The account balance covers the debt partially
+                    var result = Transfers.Transfer(pack, CreateTaxDirectTransferData(Creator, account, taxDebt.Settlement, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), amount));
+                    if (!result.Success)
+                    {
+                        Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}");
+                        continue;
+                    }
+                    amountCollected += amount;
+                    amountToCollect -= amount;
+                }
+
             }
-            if (total >= taxDebt.Amount)
+
+            // Did we manage to collect anything at all?
+            if (amountCollected > 0.0f)
             {
-                // Their balance covers the debt fully
-                TaxLog.AddTaxEvent(new CollectionEvent(taxDebt.Amount, taxDebt));
-                var result = Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), taxDebt.Amount));
-                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}"); }
-                taxDebt.Amount = 0.0f;
-                TaxDebts.Remove(taxDebt);
+                TaxLog.AddTaxEvent(new CollectionEvent(amountCollected, taxDebt));
+                taxDebt.Amount = amountToCollect;
+                if (taxDebt.Amount < Transfers.AlmostZero)
+                {
+                    TaxDebts.Remove(taxDebt);
+                }
                 return true;
             }
-            else if (total > Transfers.AlmostZero)
-            {
-                // Their balance covers the debt partially
-                TaxLog.AddTaxEvent(new CollectionEvent(total, taxDebt));
-                var result = Transfers.Transfer(pack, CreateTaxTransferData(Creator, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), total));
-                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}"); }
-                taxDebt.Amount -= total;
-                return true;
-            }
+
             return false;
         }
 
-        private static Settlement GetSettlementForAccount(BankAccount bankAccount)
-            => Registrars.Get<Settlement>()
-                .FirstOrDefault(x => x.TreasuryBankAccount == bankAccount);
-
-        /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
-        private static TransferData CreateTaxTransferData(User taxPayer, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
+        private static TransferData CreateTaxDirectTransferData(User taxPayer, BankAccount sourceAccount, Settlement settlement, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new()
         {
-            Receiver = taxPayer,                     // For taxes this guy's accounts will be targeted.
-            TaxableAmount = amount,    // For pure taxes we set TaxableAmount instead of Amount.
-            Amount = 0.0f,
-            SourceAccount = null,        // For taxes: receiver's accounts will be auto-selected by the system.
-            TargetAccount = null,        // For taxes: use TaxDestination instead of TargetAccount.
-            TaxDestination = targetAccount,
-            TaxRate = 1.0f,                // 100% of TaxableAmount must be payed.
+            Receiver = taxPayer,
+            TaxableAmount = null,
+            Amount = amount,
+            SourceAccount = sourceAccount,        // For taxes: receiver's accounts will be auto-selected by the system.
+            TargetAccount = targetAccount,        // For taxes: use TaxDestination instead of TargetAccount.
+            TaxDestination = null,
+            TaxRate = null,
             ServerMessageToAll = NotificationCategory.Tax,
 
             // Shared defaults (always the same).
@@ -515,11 +555,35 @@ namespace Eco.Mods.SmartTax
             SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
             IsFundsAllocation = false,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
             Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
-            Location = GetSettlementForAccount(targetAccount)?.Position ?? null,
+            Location = settlement?.Position ?? null,
+        };
+
+        private static TransferData CreateTaxTransferData(User taxPayer, Settlement settlement, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new ()
+        {
+            Receiver = taxPayer,
+            TaxableAmount = amount,
+            Amount = 0.0f,
+            SourceAccount = null,        // For taxes: receiver's accounts will be auto-selected by the system.
+            TargetAccount = null,        // For taxes: use TaxDestination instead of TargetAccount.
+            TaxDestination = targetAccount,
+            TaxRate = 1.0f,
+            ServerMessageToAll = NotificationCategory.Tax,
+
+            // Shared defaults (always the same).
+            Currency = currency,
+            TransferDescription = transactionDescription,
+            // AmountDescription
+            // HideAmount
+            TransferAsMuchAsPossible = true, // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
+            UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
+            SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
+            IsFundsAllocation = false,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
+            Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
+            Location = settlement?.Position ?? null,
         };
 
         /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
-        private static TransferData CreatePaymentTransferData(User paymentReceiver, BankAccount sourceAccount, Currency currency, LocString transactionDescription, float amount) => new TransferData()
+        private static TransferData CreatePaymentTransferData(User paymentReceiver, Settlement settlement, BankAccount sourceAccount, Currency currency, LocString transactionDescription, float amount) => new ()
         {
             Receiver = paymentReceiver,
             TaxableAmount = 0.0f,
@@ -540,7 +604,7 @@ namespace Eco.Mods.SmartTax
             SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
             IsFundsAllocation = true,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
             Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
-            Location = GetSettlementForAccount(sourceAccount)?.Position ?? null,
+            Location = settlement?.Position ?? null,
         };
 
     }

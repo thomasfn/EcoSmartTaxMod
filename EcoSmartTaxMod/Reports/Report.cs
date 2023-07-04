@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace Eco.Mods.SmartTax.Reports
@@ -7,6 +6,7 @@ namespace Eco.Mods.SmartTax.Reports
     using Core.Utils;
 
     using Gameplay.Economy;
+    using Gameplay.Settlements;
 
     using Shared.Utils;
     using Shared.Serialization;
@@ -119,22 +119,22 @@ namespace Eco.Mods.SmartTax.Reports
             return DayReports[dayIndex];
         }
 
-        public void RecordTax(BankAccount targetAccount, Currency currency, string taxCode, float amount)
+        public void RecordTax(Settlement settlement, BankAccount targetAccount, Currency currency, string taxCode, float amount)
         {
-            TotalReport.RecordTax(targetAccount, currency, taxCode, amount);
-            GetOrCreateCurrentDayReport().RecordTax(targetAccount, currency, taxCode, amount);
+            TotalReport.RecordTax(settlement, targetAccount, currency, taxCode, amount);
+            GetOrCreateCurrentDayReport().RecordTax(settlement, targetAccount, currency, taxCode, amount);
         }
 
-        public void RecordPayment(BankAccount sourceAccount, Currency currency, string paymentCode, float amount)
+        public void RecordPayment(Settlement settlement, BankAccount sourceAccount, Currency currency, string paymentCode, float amount)
         {
-            TotalReport.RecordPayment(sourceAccount, currency, paymentCode, amount);
-            GetOrCreateCurrentDayReport().RecordPayment(sourceAccount, currency, paymentCode, amount);
+            TotalReport.RecordPayment(settlement, sourceAccount, currency, paymentCode, amount);
+            GetOrCreateCurrentDayReport().RecordPayment(settlement, sourceAccount, currency, paymentCode, amount);
         }
 
-        public void RecordRebate(BankAccount targetAccount, Currency currency, string rebateCode, float amount)
+        public void RecordRebate(Settlement settlement, BankAccount targetAccount, Currency currency, string rebateCode, float amount)
         {
-            TotalReport.RecordRebate(targetAccount, currency, rebateCode, amount);
-            GetOrCreateCurrentDayReport().RecordRebate(targetAccount, currency, rebateCode, amount);
+            TotalReport.RecordRebate(settlement, targetAccount, currency, rebateCode, amount);
+            GetOrCreateCurrentDayReport().RecordRebate(settlement, targetAccount, currency, rebateCode, amount);
         }
 
         public float QueryTaxes(Currency currency, BankAccount filterTargetAccount = null, string filterTaxCode = null, ReportInterval? interval = null)

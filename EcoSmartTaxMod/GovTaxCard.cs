@@ -14,7 +14,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Players;
     using Gameplay.Economy;
     using Gameplay.Items;
-    
+    using Gameplay.Settlements;
 
     using Shared.Serialization;
     using Shared.Localization;
@@ -41,19 +41,19 @@ namespace Eco.Mods.SmartTax
             return taxCard;
         }
 
-        public void RecordTax(Currency currency, string taxCode, float amount)
+        public void RecordTax(Settlement settlement, Currency currency, string taxCode, float amount)
         {
-            Report.RecordTax(Account, currency, taxCode, amount);
+            Report.RecordTax(settlement, Account, currency, taxCode, amount);
         }
 
-        public void RecordPayment(Currency currency, string paymentCode, float amount)
+        public void RecordPayment(Settlement settlement, Currency currency, string paymentCode, float amount)
         {
-            Report.RecordPayment(Account, currency, paymentCode, amount);
+            Report.RecordPayment(settlement, Account, currency, paymentCode, amount);
         }
 
-        public void RecordRebate(Currency currency, string rebateCode, float amount)
+        public void RecordRebate(Settlement settlement, Currency currency, string rebateCode, float amount)
         {
-            Report.RecordRebate(Account, currency, rebateCode, amount);
+            Report.RecordRebate(settlement, Account, currency, rebateCode, amount);
         }
 
         public void OpenReport(Player player)

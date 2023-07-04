@@ -21,6 +21,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Aliases;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
+    using Gameplay.Settlements;
 
     [Eco, LocCategory("Finance"), CreateComponentTabLoc("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Tax"), HasIcon("Tax_LegalAction"), LocDescription("A smarter tax that applies rebates, tracks debt and aggregates transactions.")]
     public class SmartTax_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
@@ -68,31 +69,37 @@ namespace Eco.Mods.SmartTax
 
             if (currency == null) { return new PostResult($"Transfer currency must be set.", true); }
             if (targetBankAccount == null) { return new PostResult($"Target bank account must be set.", true); }
+            if (alias == null) { return new PostResult($"Taxation without target citizen skipped.", true); }
 
-            var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult($"Taxation without target citizen skipped.", true); }
+            var jurisdiction = Jurisdiction.FromContext(context, law);
+            if (!jurisdiction.TestAccount(targetBankAccount)) { return new PostResult($"{targetBankAccount.MarkedUpName} isn't a government account of {jurisdiction} or held by any of its citizens.", true); }
+            var users = jurisdiction.GetAllowedUsersFromTarget(context, alias, out var jurisdictionDescription, "taxed");
+            if (!users.Any()) { return new PostResult(jurisdictionDescription, true); }
 
             if (silent)
             {
                 return new PostResult(() =>
                 {
-                    RecordTaxForUsers(users, targetBankAccount, currency, taxCode, amount, suspended);
+                    RecordTaxForUsers(jurisdiction.Settlement, users, targetBankAccount, currency, taxCode, amount, suspended);
                 });
             }
             return new PostResult(() =>
             {
-                RecordTaxForUsers(users, targetBankAccount, currency, taxCode, amount, suspended);
-                return Localizer.Do($"Issuing {(suspended ? "suspended " : "")}tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({taxCode})");
+                RecordTaxForUsers(jurisdiction.Settlement, users, targetBankAccount, currency, taxCode, amount, suspended);
+                return Localizer.Do($"Issuing {(suspended ? "suspended " : "")}tax of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {DescribeTarget(jurisdiction, targetBankAccount)} ({taxCode})");
             });
         }
 
-        private void RecordTaxForUsers(IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string taxCode, float amount, bool suspended)
+        private void RecordTaxForUsers(Settlement settlement, IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string taxCode, float amount, bool suspended)
         {
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordTax(targetBankAccount, currency, taxCode, amount, suspended);
+                taxCard.RecordTax(settlement, targetBankAccount, currency, taxCode, amount, suspended);
             }
         }
+
+        private static LocString DescribeTarget(Jurisdiction jurisdiction, BankAccount targetAccount)
+            => jurisdiction.IsGlobal ? targetAccount.UILink() : Localizer.Do($"{jurisdiction.Settlement.UILinkNullSafe()} ({targetAccount.UILink()})");
     }
 }

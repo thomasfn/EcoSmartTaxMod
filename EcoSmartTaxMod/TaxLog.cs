@@ -6,9 +6,12 @@ namespace Eco.Mods.SmartTax
 {
     using Core.Utils;
 
-    using Gameplay.Economy;
+    using Gameplay.Civics.GameValues;
+    using Gameplay.Settlements;
+    using Gameplay.Systems;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Systems.Tooltip;
+    using Gameplay.Economy;
 
     using Shared.Localization;
     using Shared.Serialization;
@@ -19,9 +22,10 @@ namespace Eco.Mods.SmartTax
     [Serialized]
     public abstract class TaxEvent
     {
-        private const int CurrentCacheVersion = 1;
+        private const int CurrentCacheVersion = 2;
 
         [Serialized] public double Time { get; set; }
+        [Serialized] public Settlement Settlement { get; set; }
         [Serialized] public BankAccount SourceOrTargetAccount { get; set; }
         [Serialized] public string TaxOrPaymentCode { get; set; }
         [Serialized] public string Description { get; set; }
@@ -29,9 +33,10 @@ namespace Eco.Mods.SmartTax
         [Serialized] public int CachedStringVersion { get; private set; }
 
         public TaxEvent() { }
-        public TaxEvent(BankAccount sourceOrTargetAccount, string taxOrPaymentCode, string description)
+        public TaxEvent(Settlement settlement, BankAccount sourceOrTargetAccount, string taxOrPaymentCode, string description)
         {
             this.Time = WorldTime.Seconds;
+            this.Settlement = settlement;
             this.SourceOrTargetAccount = sourceOrTargetAccount;
             this.TaxOrPaymentCode = taxOrPaymentCode;
             this.Description = description;
@@ -42,12 +47,25 @@ namespace Eco.Mods.SmartTax
 
         protected virtual void RebuildCachedString()
         {
-            this.CachedString = BuildString(
-                TimeFormatter.FormatSpan(this.Time),
-                this.SourceOrTargetAccount.UILink(),
-                this.TaxOrPaymentCode ?? "",
-                this.Description
-            );
+            if (FeatureConfig.Obj.SettlementSystemEnabled)
+            {
+                this.CachedString = BuildString(
+                    TimeFormatter.FormatSpan(this.Time),
+                    this.Settlement.UILinkNullSafe(),
+                    this.SourceOrTargetAccount.UILink(),
+                    this.TaxOrPaymentCode ?? "",
+                    this.Description
+                );
+            }
+            else
+            {
+                this.CachedString = BuildStringNoJurisdiction(
+                    TimeFormatter.FormatSpan(this.Time),
+                    this.SourceOrTargetAccount.UILink(),
+                    this.TaxOrPaymentCode ?? "",
+                    this.Description
+                );
+            }
             this.CachedStringVersion = CurrentCacheVersion;
         }
 
@@ -60,8 +78,11 @@ namespace Eco.Mods.SmartTax
             return this.CachedString;
         }
 
-        public static string BuildString(string time, string targetAccount, string taxCode, string description)
-            => Text.Columns(2, Transaction.EmBaseSize, (time, 8), (targetAccount, 20), (taxCode, 20), (description, 72));
+        public static string BuildString(string time, string jurisdiction, string targetAccount, string taxCode, string description)
+            => Text.Columns(2, Transaction.EmBaseSize, (time, 4), (jurisdiction, 18), (targetAccount, 18), (taxCode, 18), (description, 62));
+
+        public static string BuildStringNoJurisdiction(string time, string targetAccount, string taxCode, string description)
+            => Text.Columns(2, Transaction.EmBaseSize, (time, 4), (targetAccount, 20), (taxCode, 20), (description, 76));
 
     }
 
@@ -70,10 +91,10 @@ namespace Eco.Mods.SmartTax
     {
         public SettlementEvent() { }
         public SettlementEvent(PaymentCredit paymentCredit, bool partial, TaxDebt taxDebt)
-            : base(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{paymentCredit.Description} used to {(partial ? "partially" : "fully")} settle {taxDebt.Description}"))
+            : base(taxDebt.Settlement, taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{paymentCredit.DescriptionNoAccount} used to {(partial ? "partially" : "fully")} settle {taxDebt.DescriptionNoAccount}"))
         { }
         public SettlementEvent(TaxRebate taxRebate, bool partial, TaxDebt taxDebt)
-           : base(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.Description} used to {(partial ? "partially" : "fully")} settle {taxDebt.Description}"))
+            : base(taxRebate.Settlement, taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxRebate.DescriptionNoAccount} used to {(partial ? "partially" : "fully")} settle {taxDebt.DescriptionNoAccount}"))
         { }
     }
 
@@ -82,7 +103,7 @@ namespace Eco.Mods.SmartTax
     {
         public PaymentEvent() { }
         public PaymentEvent(float amount, PaymentCredit paymentCredit)
-            : base(paymentCredit.SourceAccount, paymentCredit.PaymentCode, amount < paymentCredit.Amount ? Localizer.Do($"Paid {paymentCredit.Currency.UILink(amount)} for {paymentCredit.Description}") : Localizer.Do($"Fully paid {paymentCredit.Description}"))
+            : base(paymentCredit.Settlement, paymentCredit.SourceAccount, paymentCredit.PaymentCode, amount < paymentCredit.Amount ? Localizer.Do($"Paid {paymentCredit.Currency.UILink(amount)} for {paymentCredit.DescriptionNoAccount}") : Localizer.Do($"Fully paid {paymentCredit.DescriptionNoAccount}"))
         { }
     }
 
@@ -91,7 +112,7 @@ namespace Eco.Mods.SmartTax
     {
         public CollectionEvent() { }
         public CollectionEvent(float amount, TaxDebt taxDebt)
-            : base(taxDebt.TargetAccount, taxDebt.TaxCode, amount < taxDebt.Amount ? Localizer.Do($"Collected {taxDebt.Currency.UILink(amount)} for {taxDebt.Description}") : Localizer.Do($"Fully collected {taxDebt.Description}"))
+            : base(taxDebt.Settlement, taxDebt.TargetAccount, taxDebt.TaxCode, amount < taxDebt.Amount ? Localizer.Do($"Collected {taxDebt.Currency.UILink(amount)} for {taxDebt.DescriptionNoAccount}") : Localizer.Do($"Fully collected {taxDebt.DescriptionNoAccount}"))
         { }
     }
 
@@ -103,15 +124,15 @@ namespace Eco.Mods.SmartTax
         [Serialized] public int Occurrences { get; set; }
 
         public RecordTaxEvent() { }
-        public RecordTaxEvent(BankAccount targetAccount, string taxCode, float amount, Currency currency, int occurrences = 1)
-            : base(targetAccount, taxCode, Localizer.Do($"Recorded tax of {currency.UILink(amount)}{(occurrences > 1 ? $" (over {occurrences} occurrences)" : "")}"))
+        public RecordTaxEvent(Settlement settlement, BankAccount targetAccount, string taxCode, float amount, Currency currency, int occurrences = 1)
+            : base(settlement, targetAccount, taxCode, Localizer.Do($"Recorded tax of {currency.UILink(amount)}{(occurrences > 1 ? $" (over {occurrences} occurrences)" : "")}"))
         {
             Amount = amount;
             Currency = currency;
             Occurrences = occurrences;
         }
         public RecordTaxEvent(RecordTaxEvent baseRecordTaxEvent, float amount)
-            : this(baseRecordTaxEvent.SourceOrTargetAccount, baseRecordTaxEvent.TaxOrPaymentCode, baseRecordTaxEvent.Amount + amount, baseRecordTaxEvent.Currency, baseRecordTaxEvent.Occurrences + 1)
+            : this(baseRecordTaxEvent.Settlement, baseRecordTaxEvent.SourceOrTargetAccount, baseRecordTaxEvent.TaxOrPaymentCode, baseRecordTaxEvent.Amount + amount, baseRecordTaxEvent.Currency, baseRecordTaxEvent.Occurrences + 1)
         { }
 
         public bool CanBeAggregatedWith(RecordTaxEvent other)
@@ -126,15 +147,15 @@ namespace Eco.Mods.SmartTax
         [Serialized] public int Occurrences { get; set; }
 
         public RecordRebateEvent() { }
-        public RecordRebateEvent(BankAccount targetAccount, string rebateCode, float amount, Currency currency, int occurrences = 1)
-            : base(targetAccount, rebateCode, Localizer.Do($"Recorded rebate of {currency.UILink(amount)}{(occurrences > 1 ? $" (over {occurrences} occurrences)" : "")}"))
+        public RecordRebateEvent(Settlement settlement, BankAccount targetAccount, string rebateCode, float amount, Currency currency, int occurrences = 1)
+            : base(settlement, targetAccount, rebateCode, Localizer.Do($"Recorded rebate of {currency.UILink(amount)}{(occurrences > 1 ? $" (over {occurrences} occurrences)" : "")}"))
         {
             Amount = amount;
             Currency = currency;
             Occurrences = occurrences;
         }
         public RecordRebateEvent(RecordRebateEvent baseRecordRebateEvent, float amount)
-            : this(baseRecordRebateEvent.SourceOrTargetAccount, baseRecordRebateEvent.TaxOrPaymentCode, baseRecordRebateEvent.Amount + amount, baseRecordRebateEvent.Currency, baseRecordRebateEvent.Occurrences + 1)
+            : this(baseRecordRebateEvent.Settlement, baseRecordRebateEvent.SourceOrTargetAccount, baseRecordRebateEvent.TaxOrPaymentCode, baseRecordRebateEvent.Amount + amount, baseRecordRebateEvent.Currency, baseRecordRebateEvent.Occurrences + 1)
         { }
 
         public bool CanBeAggregatedWith(RecordRebateEvent other)
@@ -149,15 +170,15 @@ namespace Eco.Mods.SmartTax
         [Serialized] public int Occurrences { get; set; }
 
         public RecordPaymentEvent() { }
-        public RecordPaymentEvent(BankAccount targetAccount, string paymentCode, float amount, Currency currency, int occurrences = 1)
-            : base(targetAccount, paymentCode, Localizer.Do($"Recorded payment of {currency.UILink(amount)}{(occurrences > 1 ? $" (over {occurrences} occurrences)" : "")}"))
+        public RecordPaymentEvent(Settlement settlement, BankAccount targetAccount, string paymentCode, float amount, Currency currency, int occurrences = 1)
+            : base(settlement, targetAccount, paymentCode, Localizer.Do($"Recorded payment of {currency.UILink(amount)}{(occurrences > 1 ? $" (over {occurrences} occurrences)" : "")}"))
         {
             Amount = amount;
             Currency = currency;
             Occurrences = occurrences;
         }
         public RecordPaymentEvent(RecordPaymentEvent baseRecordPaymentEvent, float amount)
-            : this(baseRecordPaymentEvent.SourceOrTargetAccount, baseRecordPaymentEvent.TaxOrPaymentCode, baseRecordPaymentEvent.Amount + amount, baseRecordPaymentEvent.Currency, baseRecordPaymentEvent.Occurrences + 1)
+            : this(baseRecordPaymentEvent.Settlement, baseRecordPaymentEvent.SourceOrTargetAccount, baseRecordPaymentEvent.TaxOrPaymentCode, baseRecordPaymentEvent.Amount + amount, baseRecordPaymentEvent.Currency, baseRecordPaymentEvent.Occurrences + 1)
         { }
 
         public bool CanBeAggregatedWith(RecordPaymentEvent other)
@@ -169,13 +190,13 @@ namespace Eco.Mods.SmartTax
     {
         public VoidEvent() { }
         public VoidEvent(TaxDebt taxDebt, string reason = "target bank account was closed")
-            : base(taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxDebt.Description} voided as {reason}"))
+            : base(taxDebt.Settlement, taxDebt.TargetAccount, taxDebt.TaxCode, Localizer.Do($"{taxDebt.Description} voided as {reason}"))
         { }
         public VoidEvent(PaymentCredit paymentCredit, string reason = "source bank account was closed")
-            : base(paymentCredit.SourceAccount, paymentCredit.PaymentCode, Localizer.Do($"{paymentCredit.Description} voided as {reason}"))
+            : base(paymentCredit.Settlement, paymentCredit.SourceAccount, paymentCredit.PaymentCode, Localizer.Do($"{paymentCredit.Description} voided as {reason}"))
         { }
         public VoidEvent(TaxRebate taxRebate, string reason = "target bank account was closed")
-            : base(taxRebate.TargetAccount, taxRebate.RebateCode, Localizer.Do($"{taxRebate.Description} voided as {reason}"))
+            : base(taxRebate.Settlement, taxRebate.TargetAccount, taxRebate.RebateCode, Localizer.Do($"{taxRebate.Description} voided as {reason}"))
         { }
     }
 
@@ -246,12 +267,25 @@ namespace Eco.Mods.SmartTax
             if (this.Events.Count >= MaxToShow - 1)
                 sb.AppendLine(Localizer.Do($"(Displaying last {MaxToShow} events.)"));
 
-            sb.AppendLine(TaxEvent.BuildString(
-                TextLoc.BoldLocStr("Date"),
-                TextLoc.BoldLocStr("Account"),
-                TextLoc.BoldLocStr("Code"),
-                TextLoc.BoldLocStr("Description")
-            ));
+            if (FeatureConfig.Obj.SettlementSystemEnabled)
+            {
+                sb.AppendLine(TaxEvent.BuildString(
+                    TextLoc.BoldLocStr("Date"),
+                    TextLoc.BoldLocStr("Jurisdiction"),
+                    TextLoc.BoldLocStr("Account"),
+                    TextLoc.BoldLocStr("Code"),
+                    TextLoc.BoldLocStr("Description")
+                ));
+            }
+            else
+            {
+                sb.AppendLine(TaxEvent.BuildStringNoJurisdiction(
+                    TextLoc.BoldLocStr("Date"),
+                    TextLoc.BoldLocStr("Account"),
+                    TextLoc.BoldLocStr("Code"),
+                    TextLoc.BoldLocStr("Description")
+                ));
+            }
 
             if (HeadEvent != null)
             {
