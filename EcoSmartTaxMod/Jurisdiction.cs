@@ -18,28 +18,35 @@ namespace Eco.Mods.SmartTax
     using Shared.Items;
     using Shared.Localization;
     using Shared.Math;
+    using Shared.Utils;
 
     public readonly struct Jurisdiction
     {
-        public static readonly Jurisdiction None = new (true, null);
-        public static readonly Jurisdiction Global = new (false, null);
+        public static readonly Jurisdiction None = new (true, null, null);
+        public static readonly Jurisdiction Global = new (false, null, null);
 
         public readonly bool Restricted;
         public readonly Settlement Settlement;
+        public readonly IReadOnlySet<User> AdditionalCitizens;
 
         public bool IsGlobal => !Restricted;
 
         public bool IsNone => Restricted && Settlement == null;
 
-        public Jurisdiction(bool restricted, Settlement settlement)
+        public Jurisdiction(bool restricted, Settlement settlement, IEnumerable<User> additionalCitizens)
         {
             Restricted = restricted;
             Settlement = settlement;
+            AdditionalCitizens = additionalCitizens != null ? new HashSet<User>(additionalCitizens) : null;
         }
 
         public static Jurisdiction FromContext(IContextObject context, Law law)
             => FeatureConfig.Obj.SettlementSystemEnabled
-                ? new Jurisdiction(true, (context is IContextSettlement contextSettlement && contextSettlement.LimitToCitizensOfSettlement != null ? contextSettlement.LimitToCitizensOfSettlement : null) ?? law?.Settlement)
+                ? new Jurisdiction(
+                    true,
+                    (context is IContextSettlement contextSettlement && contextSettlement.LimitToCitizensOfSettlement != null ? contextSettlement.LimitToCitizensOfSettlement : null) ?? law?.Settlement,
+                    context is IUserGameAction userGameAction && userGameAction.Citizen != null ? userGameAction.Citizen.SingleItemAsEnumerable() : null
+                )
                 : Jurisdiction.Global;
 
         public bool TestPosition(Vector2i pos)
@@ -49,7 +56,7 @@ namespace Eco.Mods.SmartTax
             => TestPosition(pos.XZ);
 
         public bool TestCitizen(User user)
-            => IsGlobal || (Settlement?.Citizens.Contains(user) ?? false);
+            => IsGlobal || (Settlement?.Citizens.Contains(user) ?? false) || (AdditionalCitizens?.Contains(user) ?? false);
 
         public bool TestAccount(BankAccount bankAccount)
         {
@@ -71,20 +78,7 @@ namespace Eco.Mods.SmartTax
     {
         public static IEnumerable<User> GetAllowedUsersFromTarget(this Jurisdiction jurisdiction, IContextObject context, IAlias alias, out LocString description, string verb = "targeted")
         {
-            Vector3i? actionPosition = context is IPositionGameAction positionGameAction ? positionGameAction.ActionLocation : null;
-            User actionUser = context is IUserGameAction userGameAction ? userGameAction.Citizen : null;
-
-            var allowedUsers = alias.UserSet.Where(x =>
-            {
-                // A user is considered within our jurisdiction if any one of the following is true:
-                // - the action took place within the settlement AND the user is the one performing the action
-                // - the user is a citizen of the settlement
-
-                if (actionPosition != null && x == actionUser && jurisdiction.TestPosition(actionPosition.Value)) { return true; }
-                if (jurisdiction.TestCitizen(x)) { return true; }
-
-                return false;
-            }).ToArray();
+            var allowedUsers = alias.UserSet.Where(jurisdiction.TestCitizen);
 
             if (!allowedUsers.Any())
             {

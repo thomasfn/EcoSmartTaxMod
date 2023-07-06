@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
 
@@ -483,12 +484,12 @@ namespace Eco.Mods.SmartTax
             if (taxDebt.Suspended) { return false; }
 
             // Iterate their accounts, searching for funds to settle the debt
-            var accounts = Transfers.GetTaxableAccountsForUser(Creator, taxDebt.Currency);
+            var accounts = GetTaxableAccounts(taxDebt.Currency);
             float amountToCollect = taxDebt.Amount;
             float amountCollected = 0.0f;
-            foreach (var account in accounts)
+            foreach (var (account, ownership) in accounts)
             {
-                var amount = account.GetCurrencyHoldingVal(taxDebt.Currency, Creator);
+                var amount = account.GetCurrencyHoldingVal(taxDebt.Currency, Creator) * ownership;
                 if (amount < Transfers.AlmostZero) { continue; }
 
                 if (amount >= amountToCollect)
@@ -533,6 +534,17 @@ namespace Eco.Mods.SmartTax
 
             return false;
         }
+
+        private IEnumerable<(BankAccount account, float ownership)> GetTaxableAccounts(Currency currency)
+            => Registrars.Get<BankAccount>()
+                .Where(x => x is not GovernmentBankAccount && x is not TreasuryBankAccount)
+                .Where(x => x.PercentOwnership(Creator) > 0.0f)
+                .Where(x => x.GetCurrencyHoldingVal(currency) > 0.0f)
+                .OrderByDescending(x => x is PersonalBankAccount)
+                .ThenByDescending(x => x.CanAccess(Creator, AccountAccess.Manage))
+                .ThenByDescending(x => x.GetCurrencyHoldingVal(currency))
+                .Select(x => (x, x.PercentOwnership(Creator)))
+                .ToArray();
 
         private static TransferData CreateTaxDirectTransferData(User taxPayer, BankAccount sourceAccount, Settlement settlement, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new()
         {
