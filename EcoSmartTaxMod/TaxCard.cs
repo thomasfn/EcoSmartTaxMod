@@ -16,6 +16,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Players;
     using Gameplay.Economy;
     using Gameplay.Economy.Transfer;
+    using Gameplay.Economy.Transfer.Internal;
     using Gameplay.GameActions;
     using Gameplay.Items;
     using Gameplay.Settlements;
@@ -453,8 +454,16 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be fully paid
                 TaxLog.AddTaxEvent(new PaymentEvent(paymentCredit.Amount, paymentCredit));
-                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.Settlement, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), paymentCredit.Amount));
-                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (payment of {paymentCredit.Amount} {paymentCredit.Currency.Name} from {paymentCredit.SourceAccount.Name} to {Creator.Name}) - {result}"); }
+                TransferInternalUtils.TransferInternal(
+                    pack, paymentCredit.Amount, paymentCredit.Currency, paymentCredit.SourceAccount, Creator.BankAccount,
+                    isTax: false,
+                    useFullDesc: true,
+                    hideAmount: false,
+                    notify: NotificationCategory.Tax,
+                    style: NotificationStyle.EcoLog,
+                    desc: Localizer.NotLocalizedStr(paymentCredit.PaymentCode),
+                    amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
+                );
                 paymentCredit.Amount = 0.0f;
                 PaymentCredits.Remove(paymentCredit);
                 return true;
@@ -463,8 +472,16 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be partially paid
                 TaxLog.AddTaxEvent(new PaymentEvent(availableAmount, paymentCredit));
-                var result = Transfers.Transfer(pack, CreatePaymentTransferData(Creator, paymentCredit.Settlement, paymentCredit.SourceAccount, paymentCredit.Currency, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), availableAmount));
-                if (!result.Success) { Logger.Debug($"Unexpected transfer fail (payment of {paymentCredit.Amount} {paymentCredit.Currency.Name} from {paymentCredit.SourceAccount.Name} to {Creator.Name}) - {result}"); }
+                TransferInternalUtils.TransferInternal(
+                    pack, availableAmount, paymentCredit.Currency, paymentCredit.SourceAccount, Creator.BankAccount,
+                    isTax: false,
+                    useFullDesc: true,
+                    hideAmount: false,
+                    notify: NotificationCategory.Tax,
+                    style: NotificationStyle.EcoLog,
+                    desc: Localizer.NotLocalizedStr(paymentCredit.PaymentCode),
+                    amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
+                );
                 paymentCredit.Amount -= availableAmount;
                 return true;
             }
@@ -495,12 +512,16 @@ namespace Eco.Mods.SmartTax
                 if (amount >= amountToCollect)
                 {
                     // The account balance covers the debt fully
-                    var result = Transfers.Transfer(pack, CreateTaxDirectTransferData(Creator, account, taxDebt.Settlement, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), amountToCollect));
-                    if (!result.Success)
-                    {
-                        Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}");
-                        continue;
-                    }
+                    TransferInternalUtils.TransferInternal(
+                        pack, amountToCollect, taxDebt.Currency, account, taxDebt.TargetAccount,
+                        isTax: true,
+                        useFullDesc: true,
+                        hideAmount: false,
+                        notify: NotificationCategory.Tax,
+                        style: NotificationStyle.EcoLog,
+                        desc: Localizer.NotLocalizedStr(taxDebt.TaxCode),
+                        amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
+                    );
                     amountCollected += amountToCollect;
                     amountToCollect = 0.0f;
                     break;
@@ -508,16 +529,19 @@ namespace Eco.Mods.SmartTax
                 else if (amount > Transfers.AlmostZero)
                 {
                     // The account balance covers the debt partially
-                    var result = Transfers.Transfer(pack, CreateTaxDirectTransferData(Creator, account, taxDebt.Settlement, taxDebt.TargetAccount, taxDebt.Currency, Localizer.NotLocalizedStr(taxDebt.TaxCode), amount));
-                    if (!result.Success)
-                    {
-                        Logger.Debug($"Unexpected transfer fail (tax of {taxDebt.Amount} {taxDebt.Currency.Name} from {Creator.Name} to {taxDebt.TargetAccount.Name}) - {result}");
-                        continue;
-                    }
+                    TransferInternalUtils.TransferInternal(
+                        pack, amount, taxDebt.Currency, account, taxDebt.TargetAccount,
+                        isTax: true,
+                        useFullDesc: true,
+                        hideAmount: false,
+                        notify: NotificationCategory.Tax,
+                        style: NotificationStyle.EcoLog,
+                        desc: Localizer.NotLocalizedStr(taxDebt.TaxCode),
+                        amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
+                    );
                     amountCollected += amount;
                     amountToCollect -= amount;
                 }
-
             }
 
             // Did we manage to collect anything at all?
@@ -531,93 +555,18 @@ namespace Eco.Mods.SmartTax
                 }
                 return true;
             }
-
             return false;
         }
 
         private IEnumerable<(BankAccount account, float ownership)> GetTaxableAccounts(Currency currency)
             => Registrars.Get<BankAccount>()
-                .Where(x => x is not GovernmentBankAccount && x is not TreasuryBankAccount)
-                .Where(x => x.PercentOwnership(Creator) > 0.0f)
-                .Where(x => x.GetCurrencyHoldingVal(currency) > 0.0f)
-                .OrderByDescending(x => x is PersonalBankAccount)
-                .ThenByDescending(x => x.CanAccess(Creator, AccountAccess.Manage))
-                .ThenByDescending(x => x.GetCurrencyHoldingVal(currency))
-                .Select(x => (x, x.PercentOwnership(Creator)))
-                .ToArray();
-
-        private static TransferData CreateTaxDirectTransferData(User taxPayer, BankAccount sourceAccount, Settlement settlement, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new()
-        {
-            Receiver = taxPayer,
-            TaxableAmount = null,
-            Amount = amount,
-            SourceAccount = sourceAccount,        // For taxes: receiver's accounts will be auto-selected by the system.
-            TargetAccount = targetAccount,        // For taxes: use TaxDestination instead of TargetAccount.
-            TaxDestination = null,
-            TaxRate = null,
-            ServerMessageToAll = NotificationCategory.Tax,
-
-            // Shared defaults (always the same).
-            Currency = currency,
-            TransferDescription = transactionDescription,
-            // AmountDescription
-            // HideAmount
-            TransferAsMuchAsPossible = true, // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
-            UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
-            SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
-            IsFundsAllocation = false,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
-            Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
-            Location = settlement?.Position ?? null,
-        };
-
-        private static TransferData CreateTaxTransferData(User taxPayer, Settlement settlement, BankAccount targetAccount, Currency currency, LocString transactionDescription, float amount) => new ()
-        {
-            Receiver = taxPayer,
-            TaxableAmount = amount,
-            Amount = 0.0f,
-            SourceAccount = null,        // For taxes: receiver's accounts will be auto-selected by the system.
-            TargetAccount = null,        // For taxes: use TaxDestination instead of TargetAccount.
-            TaxDestination = targetAccount,
-            TaxRate = 1.0f,
-            ServerMessageToAll = NotificationCategory.Tax,
-
-            // Shared defaults (always the same).
-            Currency = currency,
-            TransferDescription = transactionDescription,
-            // AmountDescription
-            // HideAmount
-            TransferAsMuchAsPossible = true, // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
-            UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
-            SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
-            IsFundsAllocation = false,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
-            Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
-            Location = settlement?.Position ?? null,
-        };
-
-        /// <summary> Creates an instance of <see cref="TransferData"/> and fills it with default values based on the provided params. </summary>
-        private static TransferData CreatePaymentTransferData(User paymentReceiver, Settlement settlement, BankAccount sourceAccount, Currency currency, LocString transactionDescription, float amount) => new ()
-        {
-            Receiver = paymentReceiver,
-            TaxableAmount = 0.0f,
-            Amount = amount,
-            SourceAccount = sourceAccount,
-            TargetAccount = paymentReceiver.BankAccount,
-            TaxDestination = null,
-            TaxRate = 0.0f,
-            ServerMessageToAll = NotificationCategory.Finance,
-
-            // Shared defaults (always the same).
-            Currency = currency,
-            TransferDescription = transactionDescription,
-            // AmountDescription
-            // HideAmount
-            TransferAsMuchAsPossible = true,  // If PreventIfUnableToPay is true: request paying of the whole amount. This will result failed early result of the helper pack if user does not have enough money.
-            UseFullDescription = true,                         // Show full info about transfers in the feedback messages.
-            SuperAccess = true,                         // Legal actions come through elections, and we do not need access checks for the selected account.
-            IsFundsAllocation = true,                         // Just in case (we SuppressGameActions, so it won't affect anything (at least currently)).
-            Sender = null,                         // Just to show it in usage references. The value is null because these transfers are from government.
-            Location = settlement?.Position ?? null,
-        };
-
+            .Where(x => x is not GovernmentBankAccount && x is not TreasuryBankAccount)
+            .Where(x => x.PercentOwnership(Creator) > 0.0f)
+            .Where(x => x.GetCurrencyHoldingVal(currency) > 0.0f)
+            .OrderByDescending(x => x is PersonalBankAccount)
+            .ThenByDescending(x => x.CanAccess(Creator, AccountAccess.Manage))
+            .ThenByDescending(x => x.GetCurrencyHoldingVal(currency))
+            .Select(x => (x, x.PercentOwnership(Creator)))
+            .ToArray();
     }
 }
