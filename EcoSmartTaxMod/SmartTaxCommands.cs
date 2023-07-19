@@ -2,7 +2,6 @@
 
 namespace Eco.Mods.SmartTax
 {
-
     using Gameplay.Players;
     using Gameplay.Economy;
     using Gameplay.Systems.Messaging.Chat.Commands;
@@ -14,17 +13,17 @@ namespace Eco.Mods.SmartTax
         public static void Tax() { }
 
         [ChatSubCommand("Tax", "Shows the player's tax card.", ChatAuthorizationLevel.User)]
-        public static void Card(User user)
+        public static void Card(User user, int pageNumber = 1)
         {
             var taxCard = TaxCard.GetOrCreateForUser(user);
-            taxCard.OpenReport(user.Player);
+            taxCard.OpenReport(user.Player, pageNumber);
         }
 
         [ChatSubCommand("Tax", "Shows another player's tax card.", ChatAuthorizationLevel.User)]
-        public static void OtherCard(User user, User otherUser)
+        public static void OtherCard(User user, User otherUser, int pageNumber = 1)
         {
             var taxCard = TaxCard.GetOrCreateForUser(otherUser);
-            taxCard.OpenReport(user.Player);
+            taxCard.OpenReport(user.Player, pageNumber);
         }
 
         [ChatSubCommand("Tax", "Shows the account's government tax card.", ChatAuthorizationLevel.User)]

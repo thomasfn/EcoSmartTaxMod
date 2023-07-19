@@ -140,6 +140,29 @@ namespace Eco.Mods.SmartTax
     }
 
     [Serialized]
+    public class RecordTransferEvent : TaxEvent
+    {
+        [Serialized] public float Amount { get; set; }
+        [Serialized] public Currency Currency { get; set; }
+        [Serialized] public int Occurrences { get; set; }
+
+        public RecordTransferEvent() { }
+        public RecordTransferEvent(Settlement settlement, BankAccount targetAccount, string transferCode, float amount, Currency currency, int occurrences = 1)
+            : base(settlement, targetAccount, transferCode, Localizer.Do($"Recorded transfer of {currency.UILink(amount)}{(occurrences > 1 ? $" (over {occurrences} occurrences)" : "")}"))
+        {
+            Amount = amount;
+            Currency = currency;
+            Occurrences = occurrences;
+        }
+        public RecordTransferEvent(RecordTransferEvent baseRecordTransferEvent, float amount)
+            : this(baseRecordTransferEvent.Settlement, baseRecordTransferEvent.SourceOrTargetAccount, baseRecordTransferEvent.TaxOrPaymentCode, baseRecordTransferEvent.Amount + amount, baseRecordTransferEvent.Currency, baseRecordTransferEvent.Occurrences + 1)
+        { }
+
+        public bool CanBeAggregatedWith(RecordTransferEvent other)
+            => SourceOrTargetAccount == other.SourceOrTargetAccount && TaxOrPaymentCode == other.TaxOrPaymentCode && Currency == other.Currency;
+    }
+
+    [Serialized]
     public class RecordRebateEvent : TaxEvent
     {
         [Serialized] public float Amount { get; set; }
@@ -207,58 +230,75 @@ namespace Eco.Mods.SmartTax
 
         const int MaxToShow = 100;
 
-        [Serialized] TaxEvent HeadEvent { get; set; }
+        [Serialized] ThreadSafeList<TaxEvent> Events { get; set; }
 
-        [Serialized] ThreadSafeLimitedHistory<TaxEvent> Events { get; set; }
-
-        public TaxLog() => this.Events = new ThreadSafeLimitedHistory<TaxEvent>(MaxToShow - 1);
+        public TaxLog() => this.Events = new ThreadSafeList<TaxEvent>();
 
         public TaxCard TaxCard { get; private set; }
 
         public void AddTaxEvent(TaxEvent taxEvent)
         {
             OnTaxEvent.Invoke(this, taxEvent);
-            if (HeadEvent != null)
+
+            // Try to aggregate with previous events
+            for (int i = Events.Count - 1; i >= 0; --i)
             {
-                if (TryAggregateEvents(HeadEvent, taxEvent, out var aggregatedEvent))
+                var result = TryAggregateEvents(Events[i], taxEvent, out var aggregatedEvent);
+                if (result == TryAggregateEventsResult.TooOld) { break; }
+                if (result == TryAggregateEventsResult.Success)
                 {
-                    HeadEvent = aggregatedEvent;
-                    return;
+                    Events.RemoveAt(i);
+                    taxEvent = aggregatedEvent;
+                    break;
                 }
-                Events.Add(HeadEvent);
             }
-            HeadEvent = taxEvent;
+
+            // Push new event
+            Events.Add(taxEvent);
+            if (Events.Count > MaxToShow) { Events.RemoveAt(0); }
         }
 
-        private bool TryAggregateEvents(TaxEvent lastEvent, TaxEvent newEvent, out TaxEvent aggregatedEvent)
+        private enum TryAggregateEventsResult
+        {
+            TooOld,
+            WrongType,
+            Success
+        }
+
+        private TryAggregateEventsResult TryAggregateEvents(TaxEvent lastEvent, TaxEvent newEvent, out TaxEvent aggregatedEvent)
         {
             // Suppress aggregation if the difference in timestamp is large enough (e.g. don't combine an event with one from 10h ago)
             if (newEvent.Time - lastEvent.Time > SmartTaxPlugin.Obj.Config.AggregateTaxEventThreshold)
             {
                 aggregatedEvent = null;
-                return false;
+                return TryAggregateEventsResult.TooOld;
             }
 
             // Combine like events
             if (lastEvent is RecordTaxEvent previousRecordTaxEvent && newEvent is RecordTaxEvent latestRecordTaxEvent && previousRecordTaxEvent.CanBeAggregatedWith(latestRecordTaxEvent))
             {
                 aggregatedEvent = new RecordTaxEvent(previousRecordTaxEvent, latestRecordTaxEvent.Amount);
-                return true;
+                return TryAggregateEventsResult.Success;
+            }
+            if (lastEvent is RecordTransferEvent previousRecordTransferEvent && newEvent is RecordTransferEvent latestRecordTransferEvent && previousRecordTransferEvent.CanBeAggregatedWith(latestRecordTransferEvent))
+            {
+                aggregatedEvent = new RecordTransferEvent(previousRecordTransferEvent, latestRecordTransferEvent.Amount);
+                return TryAggregateEventsResult.Success;
             }
             if (lastEvent is RecordRebateEvent previousRecordRebateEvent && newEvent is RecordRebateEvent latestRecordRebateEvent && previousRecordRebateEvent.CanBeAggregatedWith(latestRecordRebateEvent))
             {
                 aggregatedEvent = new RecordRebateEvent(previousRecordRebateEvent, latestRecordRebateEvent.Amount);
-                return true;
+                return TryAggregateEventsResult.Success;
             }
             if (lastEvent is RecordPaymentEvent previousRecordPaymentEvent && newEvent is RecordPaymentEvent latestRecordPaymentEvent && previousRecordPaymentEvent.CanBeAggregatedWith(latestRecordPaymentEvent))
             {
                 aggregatedEvent = new RecordPaymentEvent(previousRecordPaymentEvent, latestRecordPaymentEvent.Amount);
-                return true;
+                return TryAggregateEventsResult.Success;
             }
 
             // Nothing to combine
             aggregatedEvent = null;
-            return false;
+            return TryAggregateEventsResult.WrongType;
         }
 
         public string RenderToText()
@@ -287,12 +327,9 @@ namespace Eco.Mods.SmartTax
                 ));
             }
 
-            if (HeadEvent != null)
+            foreach (var taxEvent in this.Events.Reverse())
             {
-
-                foreach (var taxEvent in this.Events.Reverse().Prepend(HeadEvent))
-                    sb.AppendLine(taxEvent.ToString());
-
+                sb.AppendLine(taxEvent.ToString());
             }
 
             return sb.ToString();

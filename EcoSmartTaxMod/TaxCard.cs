@@ -42,8 +42,12 @@ namespace Eco.Mods.SmartTax
 
         [Serialized] public bool Suspended { get; set; }
 
+        [Serialized] public bool IsTransfer { get; set; }
+
         private LocString TargetDescription
-            => Settlement != null ? Localizer.Do($"{Settlement.UILink()} ({TargetAccount.UILink()})") : TargetAccount.UILink();
+            => Settlement != null
+                ? (IsTransfer ? Localizer.Do($"{TargetAccount.UILink()} ({Settlement.UILink()})") : Localizer.Do($"{Settlement.UILink()} ({TargetAccount.UILink()})"))
+                : TargetAccount.UILink();
 
         public LocString Description
             => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} to {TargetDescription} ({TaxCode}){(Suspended ? " (suspended)" :"")}");
@@ -52,10 +56,10 @@ namespace Eco.Mods.SmartTax
             => Localizer.Do($"Debt of {Currency.UILinkContent(Amount)} ({TaxCode}){(Suspended ? " (suspended)" : "")}");
 
         public LocString ReportDescription
-            => Localizer.Do($"Tax ({TaxCode}) of {Currency.UILinkContent(Amount)} (to {TargetDescription})");
+            => Localizer.Do($"{(IsTransfer ? "Transfer" : "Tax")} ({TaxCode}) of {Currency.UILinkContent(Amount)} (to {TargetDescription})");
 
         public LocString ReportDescriptionNoAccount
-            => Localizer.Do($"Tax ({TaxCode}) of {Currency.UILinkContent(Amount)}");
+            => Localizer.Do($"{(IsTransfer ? "Transfer" : "Tax")} ({TaxCode}) of {Currency.UILinkContent(Amount)}");
     }
 
     [Serialized]
@@ -143,7 +147,7 @@ namespace Eco.Mods.SmartTax
             return taxCard;
         }
 
-        public void RecordTax(Settlement settlement, BankAccount targetAccount, Currency currency, string taxCode, float amount, bool suspended)
+        public void RecordTax(Settlement settlement, BankAccount targetAccount, Currency currency, string taxCode, float amount, bool suspended, bool isTransfer = false)
         {
             if (amount < Transfers.AlmostZero) { return; }
             var taxEntry = TaxDebts.GetOrCreate(
@@ -160,9 +164,17 @@ namespace Eco.Mods.SmartTax
                 taxEntry.Suspended = false;
             }
             taxEntry.Amount += amount;
-            TaxLog.AddTaxEvent(new RecordTaxEvent(settlement, targetAccount, taxCode, amount, currency));
+            if (isTransfer)
+            {
+                taxEntry.IsTransfer = true;
+                TaxLog.AddTaxEvent(new RecordTransferEvent(settlement, targetAccount, taxCode, amount, currency));
+            }
+            else
+            {
+                TaxLog.AddTaxEvent(new RecordTaxEvent(settlement, targetAccount, taxCode, amount, currency));
+            }
             Report.RecordTax(settlement, targetAccount, currency, taxCode, amount);
-            if (targetAccount is GovernmentBankAccount targetGovAccount)
+            if (!isTransfer && targetAccount is GovernmentBankAccount targetGovAccount)
             {
                 GovTaxCard.GetOrCreateForAccount(targetGovAccount).RecordTax(settlement, currency, taxCode, amount);
             }
@@ -208,10 +220,50 @@ namespace Eco.Mods.SmartTax
             player.OpenInfoPanel(Localizer.Do($"Log for {this.UILink()}"), this.TaxLog.RenderToText(), "BankTransactions");
         }
 
-        public void OpenReport(Player player)
+        public void OpenReport(Player player, int pageNumber)
         {
-            
-            player.OpenInfoPanel(Localizer.Do($"Report for {this.UILink()}"), $"{TextLoc.UnderlineLocStr(Localizer.DoStr("Click to view log.").Link(TextLinkManager.GetLinkId(this)))}\nOutstanding:\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}\n\n{Report.Description}", "BankTransactions");
+            int pageIndex = pageNumber - 1;
+            var wholeReport = $"{TextLoc.UnderlineLocStr(Localizer.DoStr("Click to view log.").Link(TextLinkManager.GetLinkId(this)))}\nOutstanding:\n{DescribeDebts()}\n{DescribeRebates()}\n{DescribePayments()}\n\n{Report.Description}";
+            var page = Paginate(wholeReport.ReplaceLineEndings("\n"), pageIndex, out int numPages);
+            if (numPages == 1)
+            {
+                player.OpenInfoPanel(
+                    Localizer.Do($"Report for {this.UILink()}"),
+                    wholeReport,
+                    "BankTransactions"
+                );
+                return;
+            }
+            if (pageIndex < 0 || pageIndex >= numPages) { return; }
+            bool hasPrevPage = pageIndex > 0;
+            bool hasNextPage = pageIndex < numPages - 1;
+            player.OpenInfoPanel(
+                Localizer.Do($"Report for {this.UILink()} (page {pageNumber} of {numPages})"),
+                $"{(hasPrevPage ? $"Use /tax card {pageNumber - 1} to view previous page.\n" : "")}{(hasNextPage ? $"Use /tax card {pageNumber + 1} to view next page.\n" : "")}\n{page}",
+                "BankTransactions"
+            );
+        }
+
+        private static string Paginate(string text, int pageIndex, out int totalNumPages, string delimiter = "\n\n")
+        {
+            var sections = text.Split(delimiter, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var currentPage = new List<string>();
+            int currentPageLength = 0;
+            int currentPageIndex = 0;
+            const int MAX_PAGE_LENGTH = 1024 * 16;
+            string result = string.Empty;
+            foreach (var section in sections)
+            {
+                if (currentPageIndex == pageIndex) { currentPage.Add(section); }
+                currentPageLength += section.Length;
+                if (currentPageLength > MAX_PAGE_LENGTH)
+                {
+                    ++currentPageIndex;
+                    currentPageLength = 0;
+                }
+            }
+            totalNumPages = currentPageLength == 0 ? currentPageIndex : currentPageIndex + 1;
+            return string.Join(delimiter, currentPage);
         }
 
         public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenTaxLog(context.Player);

@@ -19,8 +19,6 @@ namespace Eco.Mods.SmartTax
     using Shared.Serialization;
 
     using Gameplay.Players;
-    using Gameplay.Economy;
-    using Gameplay.Systems.Messaging.Chat.Commands;
 
     using Simulation.Time;
 
@@ -56,7 +54,7 @@ namespace Eco.Mods.SmartTax
         public int TickInterval { get; set; } = 300;
 
         [LocDescription("Seconds before a tax event can no longer be combined with a like one.")]
-        public int AggregateTaxEventThreshold { get; set; } = 30;
+        public int AggregateTaxEventThreshold { get; set; } = 60;
     }
 
     [Localized, LocDisplayName(nameof(SmartTaxPlugin)), Priority(PriorityAttribute.High)]
