@@ -238,24 +238,27 @@ namespace Eco.Mods.SmartTax
 
         public void AddTaxEvent(TaxEvent taxEvent)
         {
-            OnTaxEvent.Invoke(this, taxEvent);
-
-            // Try to aggregate with previous events
-            for (int i = Events.Count - 1; i >= 0; --i)
+            lock (Events)
             {
-                var result = TryAggregateEvents(Events[i], taxEvent, out var aggregatedEvent);
-                if (result == TryAggregateEventsResult.TooOld) { break; }
-                if (result == TryAggregateEventsResult.Success)
-                {
-                    Events.RemoveAt(i);
-                    taxEvent = aggregatedEvent;
-                    break;
-                }
-            }
+                OnTaxEvent.Invoke(this, taxEvent);
 
-            // Push new event
-            Events.Add(taxEvent);
-            if (Events.Count > MaxToShow) { Events.RemoveAt(0); }
+                // Try to aggregate with previous events
+                for (int i = Events.Count - 1; i >= 0; --i)
+                {
+                    var result = TryAggregateEvents(Events[i], taxEvent, out var aggregatedEvent);
+                    if (result == TryAggregateEventsResult.TooOld) { break; }
+                    if (result == TryAggregateEventsResult.Success)
+                    {
+                        Events.RemoveAt(i);
+                        taxEvent = aggregatedEvent;
+                        break;
+                    }
+                }
+
+                // Push new event
+                Events.Add(taxEvent);
+                if (Events.Count > MaxToShow) { Events.RemoveAt(0); }
+            }
         }
 
         private enum TryAggregateEventsResult
