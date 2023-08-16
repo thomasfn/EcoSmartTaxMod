@@ -8,7 +8,6 @@ namespace Eco.Mods.SmartTax
     using Core.Systems;
 
     using Gameplay.Utils;
-    using Gameplay.Systems.Tooltip;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Systems.NewTooltip;
     using Gameplay.Players;
@@ -61,7 +60,7 @@ namespace Eco.Mods.SmartTax
             player.OpenInfoPanel(Localizer.Do($"Report for {this.UILink()}"), $"{Report.DescriptionNoAccount}", "BankTransactions");
         }
 
-        public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenReport(context.Player);
+        public override void OnLinkClicked(TooltipOrigin origin, TooltipClickContext clickContext, User user) => OpenReport(user.Player);
 
 
         [NewTooltip(CacheAs.Disabled, 100)]

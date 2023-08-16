@@ -13,7 +13,7 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Players;
     using Gameplay.Settlements;
     using Gameplay.Systems;
-    using Gameplay.Systems.Tooltip;
+    using Gameplay.Systems.NewTooltip;
 
     using Shared.Items;
     using Shared.Localization;

@@ -10,7 +10,6 @@ namespace Eco.Mods.SmartTax
     using Core.Utils;
 
     using Gameplay.Utils;
-    using Gameplay.Systems.Tooltip;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Systems.NewTooltip;
     using Gameplay.Players;
@@ -266,7 +265,7 @@ namespace Eco.Mods.SmartTax
             return string.Join(delimiter, currentPage);
         }
 
-        public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenTaxLog(context.Player);
+        public override void OnLinkClicked(TooltipOrigin origin, TooltipClickContext clickContext, User user) => OpenTaxLog(user.Player);
 
         public float GetDebtSum(Func<TaxDebt, bool> predicate)
             => TaxDebts

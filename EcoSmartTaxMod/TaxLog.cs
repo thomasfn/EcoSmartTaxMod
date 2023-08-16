@@ -10,7 +10,6 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Settlements;
     using Gameplay.Systems;
     using Gameplay.Systems.TextLinks;
-    using Gameplay.Systems.Tooltip;
     using Gameplay.Economy;
 
     using Shared.Localization;
@@ -268,7 +267,7 @@ namespace Eco.Mods.SmartTax
             Success
         }
 
-        private TryAggregateEventsResult TryAggregateEvents(TaxEvent lastEvent, TaxEvent newEvent, out TaxEvent aggregatedEvent)
+        private static TryAggregateEventsResult TryAggregateEvents(TaxEvent lastEvent, TaxEvent newEvent, out TaxEvent aggregatedEvent)
         {
             // Suppress aggregation if the difference in timestamp is large enough (e.g. don't combine an event with one from 10h ago)
             if (newEvent.Time - lastEvent.Time > SmartTaxPlugin.Obj.Config.AggregateTaxEventThreshold)
