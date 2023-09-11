@@ -59,16 +59,7 @@ namespace Eco.Mods.SmartTax
             => IsGlobal || (Settlement?.Citizens.Contains(user) ?? false) || (AdditionalCitizens?.Contains(user) ?? false);
 
         public bool TestAccount(BankAccount bankAccount)
-        {
-            if (IsGlobal) { return true; }
-            var settlement = Settlement;
-            if (settlement != null)
-            {
-                if (bankAccount == settlement.TreasuryBankAccount) { return true; }
-                if (bankAccount.DualPermissions.HoldersAsUsers.Any(user => settlement.Citizens.Contains(user))) { return true; }
-            }
-            return false;
-        }
+            => IsGlobal || bankAccount.Settlement == Settlement;
 
         public override string ToString()
             => IsGlobal ? "global" : Settlement != null ? Settlement.MarkedUpName : "none";
