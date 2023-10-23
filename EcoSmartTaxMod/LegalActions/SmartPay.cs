@@ -46,11 +46,11 @@ namespace Eco.Mods.SmartTax
 
         public override LocString Description()
             => Localizer.Do($"Issue payment of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.SourceBankAccount.DescribeNullSafe()} to {this.Target.DescribeNullSafe()}.");
-        protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
-        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
+        protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILinkNullSafe(), action, law?.Settlement);
+        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context, Settlement jurisdictionSettlement) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, jurisdictionSettlement);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
 
-        private PostResult Do(LocString description, IContextObject context, Law law)
+        private PostResult Do(LocString description, IContextObject context, Settlement jurisdictionSettlement)
         {
             var sourceBankAccount = this.SourceBankAccount?.Value(context).Val;
             var currency = this.Currency?.Value(context).Val;
@@ -63,7 +63,7 @@ namespace Eco.Mods.SmartTax
             if (sourceBankAccount == null) { return new PostResult($"Source bank account must be set.", true); }
             if (alias == null) { return new PostResult($"Payment without target citizen skipped.", true); }
 
-            var jurisdiction = Jurisdiction.FromContext(context, law);
+            var jurisdiction = Jurisdiction.FromContext(context, jurisdictionSettlement);
             if (!jurisdiction.TestAccount(sourceBankAccount)) { return new PostResult($"{sourceBankAccount.MarkedUpName} isn't a government account of {jurisdiction} or held by any of its citizens.", true); }
             var users = jurisdiction.GetAllowedUsersFromTarget(context, alias, out var jurisdictionDescription, "paid");
             if (!users.Any()) { return new PostResult(jurisdictionDescription, true); }

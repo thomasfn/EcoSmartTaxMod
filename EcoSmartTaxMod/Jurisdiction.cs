@@ -40,11 +40,11 @@ namespace Eco.Mods.SmartTax
             AdditionalCitizens = additionalCitizens != null ? new HashSet<User>(additionalCitizens) : null;
         }
 
-        public static Jurisdiction FromContext(IContextObject context, Law law)
+        public static Jurisdiction FromContext(IContextObject context, Settlement settlement)
             => FeatureConfig.Obj.SettlementSystemEnabled
                 ? new Jurisdiction(
                     true,
-                    (context is IContextSettlement contextSettlement && contextSettlement.LimitToCitizensOfSettlement != null ? contextSettlement.LimitToCitizensOfSettlement : null) ?? law?.Settlement,
+                    settlement,
                     context is IUserGameAction userGameAction && userGameAction.Citizen != null ? userGameAction.Citizen.SingleItemAsEnumerable() : null
                 )
                 : Jurisdiction.Global;
