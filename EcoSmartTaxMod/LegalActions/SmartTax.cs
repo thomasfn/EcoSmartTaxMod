@@ -26,7 +26,7 @@ namespace Eco.Mods.SmartTax
     [Eco, LocCategory("Finance"), CreateComponentTabLoc("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Tax"), HasIcon("Tax_LegalAction"), LocDescription("A smarter tax that applies rebates, tracks debt and aggregates transactions.")]
     public class SmartTax_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
     {
-        [Eco, LocDescription("Where the money goes. Only Government Accounts are allowed."), TaxDestinationsOnly]
+        [Eco, LocDescription("Where the money goes. Only Government Accounts are allowed."), GovernmentAccountsOnly]
         public GameValue<BankAccount> TargetBankAccount { get; set; } = MakeGameValue.Treasury;
 
         [Eco, Advanced, LocDescription("Which currency to collect the tax in.")]

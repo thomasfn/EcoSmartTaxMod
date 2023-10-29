@@ -20,7 +20,7 @@ namespace Eco.Mods.SmartTax
     {
         [Eco, Advanced, LocDescription("The currency received by the citizen to count.")] public GameValue<Currency> Currency { get; set; }
         [Eco, Advanced, LocDescription("The citizen, title or demographic whose payment record is being calculated.")] public GameValue<IAlias> Target { get; set; }
-        [Eco, Advanced, LocDescription("Filter by the Government Account from which the payments were made."), TaxDestinationsOnly, AllowNullInView] public GameValue<BankAccount> FilterSourceAccount { get; set; }
+        [Eco, Advanced, LocDescription("Filter by the Government Account from which the payments were made."), GovernmentAccountsOnly, AllowNullInView] public GameValue<BankAccount> FilterSourceAccount { get; set; }
         [Eco, LocDescription("Filter by the payment code that the payments were issued against."), AllowNullInView] public string FilterPaymentCode { get; set; }
 
         private Eval<float> FailNullSafeFloat<T>(Eval<T> eval, string paramName) =>
