@@ -344,6 +344,7 @@ namespace Eco.Mods.SmartTax
             CheckInvalidAccounts();
 
             var pack = new GameActionPack();
+            var acc = pack.GetAccountChangeSet();
             bool didWork = false;
 
             // Iterate debts, smallest first, try to cancel out with rebates
@@ -361,7 +362,7 @@ namespace Eco.Mods.SmartTax
                 .ToArray();
             foreach (var paymentCredit in payments)
             {
-                didWork |= TickPayment(paymentCredit, pack);
+                didWork |= TickPayment(paymentCredit, pack, acc);
             }
 
             // Now iterate debts again, smallest first, try to collect
@@ -370,7 +371,7 @@ namespace Eco.Mods.SmartTax
                 .ToArray();
             foreach (var taxDebt in debts)
             {
-                didWork |= TickDebt(taxDebt, pack);
+                didWork |= TickDebt(taxDebt, pack, acc);
             }
 
             if (didWork) { ServiceHolder<ITooltipSubscriptions>.Obj.MarkTooltipPartDirty(nameof(Tooltip), instance: this); }
@@ -382,6 +383,10 @@ namespace Eco.Mods.SmartTax
             if (result.Failed)
             {
                 Logger.Error($"Failed to perform GameActionPack with tax transfers: {result.Message}");
+            }
+            else
+            {
+                acc.Apply();
             }
         }
 
@@ -460,7 +465,7 @@ namespace Eco.Mods.SmartTax
         /// </summary>
         /// <param name="paymentCredit"></param>
         /// <param name="pack"></param>
-        private bool TickPayment(PaymentCredit paymentCredit, GameActionPack pack)
+        private bool TickPayment(PaymentCredit paymentCredit, GameActionPack pack, AccountChangeSet acc)
         {
             // Find any taxes that we can use the payment to pay off, smallest first
             var taxDebts = TaxDebts
@@ -505,16 +510,7 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be fully paid
                 TaxLog.AddTaxEvent(new PaymentEvent(paymentCredit.Amount, paymentCredit));
-                TransferInternalUtils.TransferInternal(
-                    pack, paymentCredit.Amount, paymentCredit.Currency, paymentCredit.SourceAccount, Creator.BankAccount,
-                    isTax: false,
-                    useFullDesc: true,
-                    hideAmount: false,
-                    notify: NotificationCategory.Tax,
-                    style: NotificationStyle.EcoLog,
-                    desc: Localizer.NotLocalizedStr(paymentCredit.PaymentCode),
-                    amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
-                );
+                TransferInternalUtils.TransferInternal(pack, paymentCredit.Amount, paymentCredit.Currency, paymentCredit.SourceAccount, Creator.BankAccount, null, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), acc);
                 paymentCredit.Amount = 0.0f;
                 PaymentCredits.Remove(paymentCredit);
                 return true;
@@ -523,16 +519,7 @@ namespace Eco.Mods.SmartTax
             {
                 // They can be partially paid
                 TaxLog.AddTaxEvent(new PaymentEvent(availableAmount, paymentCredit));
-                TransferInternalUtils.TransferInternal(
-                    pack, availableAmount, paymentCredit.Currency, paymentCredit.SourceAccount, Creator.BankAccount,
-                    isTax: false,
-                    useFullDesc: true,
-                    hideAmount: false,
-                    notify: NotificationCategory.Tax,
-                    style: NotificationStyle.EcoLog,
-                    desc: Localizer.NotLocalizedStr(paymentCredit.PaymentCode),
-                    amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
-                );
+                TransferInternalUtils.TransferInternal(pack, availableAmount, paymentCredit.Currency, paymentCredit.SourceAccount, Creator.BankAccount, null, Localizer.NotLocalizedStr(paymentCredit.PaymentCode), acc);
                 paymentCredit.Amount -= availableAmount;
                 return true;
             }
@@ -546,13 +533,13 @@ namespace Eco.Mods.SmartTax
         /// </summary>
         /// <param name="taxDebt"></param>
         /// <param name="pack"></param>
-        private bool TickDebt(TaxDebt taxDebt, GameActionPack pack)
+        private bool TickDebt(TaxDebt taxDebt, GameActionPack pack, AccountChangeSet acc)
         {
             // If it's suspended, don't try and collect yet
             if (taxDebt.Suspended) { return false; }
 
             // Iterate their accounts, searching for funds to settle the debt
-            var accounts = GetTaxableAccounts(taxDebt.Currency);
+            var accounts = GetTaxableAccounts(taxDebt.Currency, taxDebt.Settlement);
             float amountToCollect = taxDebt.Amount;
             float amountCollected = 0.0f;
             foreach (var (account, ownership) in accounts)
@@ -563,16 +550,7 @@ namespace Eco.Mods.SmartTax
                 if (amount >= amountToCollect)
                 {
                     // The account balance covers the debt fully
-                    TransferInternalUtils.TransferInternal(
-                        pack, amountToCollect, taxDebt.Currency, account, taxDebt.TargetAccount,
-                        isTax: true,
-                        useFullDesc: true,
-                        hideAmount: false,
-                        notify: NotificationCategory.Tax,
-                        style: NotificationStyle.EcoLog,
-                        desc: Localizer.NotLocalizedStr(taxDebt.TaxCode),
-                        amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
-                    );
+                    TransferInternalUtils.TransferInternal(pack, amountToCollect, taxDebt.Currency, account, taxDebt.TargetAccount, null, Localizer.NotLocalizedStr(taxDebt.TaxCode), acc);
                     amountCollected += amountToCollect;
                     amountToCollect = 0.0f;
                     break;
@@ -580,16 +558,7 @@ namespace Eco.Mods.SmartTax
                 else if (amount > Transfers.AlmostZero)
                 {
                     // The account balance covers the debt partially
-                    TransferInternalUtils.TransferInternal(
-                        pack, amount, taxDebt.Currency, account, taxDebt.TargetAccount,
-                        isTax: true,
-                        useFullDesc: true,
-                        hideAmount: false,
-                        notify: NotificationCategory.Tax,
-                        style: NotificationStyle.EcoLog,
-                        desc: Localizer.NotLocalizedStr(taxDebt.TaxCode),
-                        amountDesc: null, sourceDesc: null, targetDesc: null, ledgerDesc: null
-                    );
+                    TransferInternalUtils.TransferInternal(pack, amount, taxDebt.Currency, account, taxDebt.TargetAccount, null, Localizer.NotLocalizedStr(taxDebt.TaxCode), acc);
                     amountCollected += amount;
                     amountToCollect -= amount;
                 }
@@ -609,11 +578,12 @@ namespace Eco.Mods.SmartTax
             return false;
         }
 
-        private IEnumerable<(BankAccount account, float ownership)> GetTaxableAccounts(Currency currency)
+        private IEnumerable<(BankAccount account, float ownership)> GetTaxableAccounts(Currency currency, Settlement jurisdiction)
             => Registrars.Get<BankAccount>()
             .Where(x => x is not GovernmentBankAccount && x is not TreasuryBankAccount)
             .Where(x => x.PercentOwnership(Creator) > 0.0f)
             .Where(x => x.GetCurrencyHoldingVal(currency) > 0.0f)
+            .Where(x => jurisdiction == null || x.Settlement == null || jurisdiction.HasChildOrSelf(x.Settlement))
             .OrderByDescending(x => x is PersonalBankAccount)
             .ThenByDescending(x => x.CanAccess(Creator, AccountAccess.Manage))
             .ThenByDescending(x => x.GetCurrencyHoldingVal(currency))

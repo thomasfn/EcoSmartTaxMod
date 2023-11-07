@@ -15,9 +15,10 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Civics;
     using Gameplay.Civics.GameValues;
     using Gameplay.Civics.Laws;
-    using Gameplay.Economy;
-    using Gameplay.GameActions;
     using Gameplay.Civics.Laws.ExecutiveActions;
+    using Gameplay.Economy;
+    using Gameplay.Economy.Transfer;
+    using Gameplay.GameActions;
     using Gameplay.Aliases;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
@@ -46,8 +47,8 @@ namespace Eco.Mods.SmartTax
 
         public override LocString Description()
             => Localizer.Do($"Issue payment of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.SourceBankAccount.DescribeNullSafe()} to {this.Target.DescribeNullSafe()}.");
-        protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILinkNullSafe(), action, law?.Settlement);
-        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context, Settlement jurisdictionSettlement) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, jurisdictionSettlement);
+        protected override PostResult Perform(Law law, GameAction action, AccountChangeSet acc) => this.Do(law.UILinkNullSafe(), action, law?.Settlement);
+        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context, Settlement jurisdictionSettlement, AccountChangeSet acc) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, jurisdictionSettlement);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
 
         private PostResult Do(LocString description, IContextObject context, Settlement jurisdictionSettlement)
