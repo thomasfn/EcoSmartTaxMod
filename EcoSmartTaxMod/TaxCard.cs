@@ -583,7 +583,7 @@ namespace Eco.Mods.SmartTax
             .Where(x => x is not GovernmentBankAccount && x is not TreasuryBankAccount)
             .Where(x => x.PercentOwnership(Creator) > 0.0f)
             .Where(x => x.GetCurrencyHoldingVal(currency) > 0.0f)
-            .Where(x => jurisdiction == null || x.Settlement == null || jurisdiction.HasChildOrSelf(x.Settlement))
+            //.Where(x => jurisdiction == null || x.Settlement == null || jurisdiction.HasChildOrSelf(x.Settlement))
             .OrderByDescending(x => x is PersonalBankAccount)
             .ThenByDescending(x => x.CanAccess(Creator, AccountAccess.Manage))
             .ThenByDescending(x => x.GetCurrencyHoldingVal(currency))
