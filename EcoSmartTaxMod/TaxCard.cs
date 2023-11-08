@@ -384,10 +384,6 @@ namespace Eco.Mods.SmartTax
             {
                 Logger.Error($"Failed to perform GameActionPack with tax transfers: {result.Message}");
             }
-            else
-            {
-                acc.Apply();
-            }
         }
 
         private void CheckInvalidAccounts()
