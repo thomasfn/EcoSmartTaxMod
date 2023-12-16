@@ -1,5 +1,5 @@
 # Eco Smart Tax Mod
-A server mod for Eco 9.7 that extends the law and economy system with the following:
+A server mod for Eco 10.0 that extends the law and economy system with the following:
  - A smart tax legal action that defers collection to avoid transaction spam, and tracks debt if the citizen can't pay
  - A smart payment legal action that tracks credit if the government can't pay, and can be used to pay off tax debt
  - A smart rebate legal action that cancels out tax debt without being backed by currency
@@ -33,7 +33,7 @@ Any player can access a government tax card by running the chat command `/tax go
 ![Gov Tax Card Report](./screenshots/govtaxcard-report.png "Gov Tax Card Report")
 
 ### Smart Tax
-A tax can be issued to a player using the Smart Tax legal action from a law or executive action. This is used in a very similar manner to the vanilla Tax legal action. The Smart Tax can be found in the Finance section along with the other currency related legal actions. The important distiniction is that the Smart Tax will not collect any currency right away, instead it will try to collect on the next tax tick, which by default runs every 5 minutes. This is to avoid spamming the bank account transaction logs. Successful tax collections will trigger the "Pay Tax" law trigger.
+A tax can be issued to a player using the Smart Tax legal action from a law or executive action. This is used in a very similar manner to the vanilla Tax legal action. The Smart Tax can be found in the Finance section along with the other currency related legal actions. The important distinction is that the Smart Tax will not collect any currency right away, instead it will try to collect on the next tax tick, which by default runs every 5 minutes. This is to avoid spamming the bank account transaction logs. Successful tax collections will trigger the "Pay Tax" law trigger.
 
 ![Legal Action Dropdown](./screenshots/legalaction-dropdown.png "Legal Action Dropdown")
 
@@ -98,7 +98,7 @@ Following collection, the citizen's tax log might look as follows:
 As you can see, the events in the tax log are clearly describing the calculations of how the tax rebates and debts are combined and collected.
 
 ### Smart Payment
-A payment can be issued to a player using the Smart Payment legal action from a law or executive action. This is used in a very similar manner to the vanilla Pay legal action. The Smart Pay can be found in the Finance section along with the other currency related legal actions. As with the Smart Tax, the important distiniction is that the Smart Pay will not pay any currency right away, instead attempting to pay on the next tax tick, to avoid spamming the bank account transaction logs. Payments are also used like rebates to relieve any tax debt before actually transferring currency. Successful payments will trigger the "Received Government Funds" law trigger.
+A payment can be issued to a player using the Smart Payment legal action from a law or executive action. This is used in a very similar manner to the vanilla Pay legal action. The Smart Pay can be found in the Finance section along with the other currency related legal actions. As with the Smart Tax, the important distinction is that the Smart Pay will not pay any currency right away, instead attempting to pay on the next tax tick, to avoid spamming the bank account transaction logs. Payments are also used like rebates to relieve any tax debt before actually transferring currency. Successful payments will trigger the "Received Government Funds" law trigger.
 
 The Smart Payment legal action has the following properties:
 
@@ -120,6 +120,21 @@ This law pays 1 Euro for every asphalt concrete block placed and charges 1 Euro 
 - No transaction or notification spam. At most one transaction will be generated every tax tick, so the transaction logs of both the citizen and the Road Fund account remain usable.
 - The citizen is able to keep placing blocks even if the Road Fund account runs dry. In this case the amount they are owed is tracked and can be easily viewed on their tax card. They will be backpaid when the Road Fund account is topped up. This holds true even if the payouts in the law are changed or the law is removed entirely.
 - If the citizen needs to pull up a large section of road and is given permission by a government official to do so, the government could grant the citizen a rebate that covers the cost that would incur for the citizen. The rebate cannot be used for any purpose other than paying off the block removal charge.
+
+### Smart Transfer
+A transfer between two citizens can be facilitated using the Smart Transfer legal action from a law or executive action. The Smart Transfer can be found in the Finance section along with the other currency related legal actions. As with the other smart actions, Smart Transfer will not pay any currency right away, instead attempting to pay on the next tax tick. It will also track debt if the target is unable to pay right away. Smart Transfers show up like taxes in the tax card and logs, but are paid to the recipient's personal account rather than a government account.
+
+The Smart Transfer legal action has the following properties:
+
+| Property Name | Type | Description |
+| - | - | - |
+| Recipient | Citizen/Title/Demographic | Who to pay. If this refers to multiple citizens, e.g. via a title or demographic, the amount to transfer is distributed evenly among them. |
+| Currency | Currency | The currency to pay in. |
+| Amount | Number | The amount to pay. This can be a fixed number or any regular Eco expression. |
+| Target | Citizen/Title/Demographic | Who to withdraw money from. If this refers to multiple citizens, e.g. via a title or demographic, each citizen will pay the full amount. The amount will be withdrawn like a tax. |
+| Transfer Code | _String_ | An optional name for the transfer. This helps distinguish it from other transfers on the tax card and in the tax log. By default, the name of the law or executive action will be used. |
+| Silent | Boolean | Whether any notifications for the transfer should be suppressed. Defaults to "No". This is helpful to set when applying a tax on a high frequency event, for example, the pollute air or the block placement law trigger. Silent transfers will still show on the tax card and in the tax log. |
+| Infobox On Success | Boolean | This is built into all Eco's legal actions. For this particular one, it is not very useful, as Silent does the same thing. |
 
 ### Owed Taxes
 The amount of taxes currently owed by a player to a particular account can be queryed via the Owed Taxes game value. This returns their current tax debt. Since this could be between the point where the tax was issued and collection at the next tax tick, this could read positive even if they are currently able to pay the debt, so you should compare this value with their wealth if you want to determine if they're insolvent or not.
@@ -211,7 +226,7 @@ The tax card is stored in the game save along with all other objects such as ban
 
 ### Linux
 
-1. Run `ECO_BRANCH="release" MODKIT_VERSION="0.9.7.5-beta" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
+1. Run `ECO_BRANCH="release" MODKIT_VERSION="0.10.0.0-beta" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
 2. Enter the `EcoSmartTaxMod` directory and run:
 `dotnet restore`
 `dotnet build`

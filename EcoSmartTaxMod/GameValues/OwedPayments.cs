@@ -20,7 +20,7 @@ namespace Eco.Mods.SmartTax
     {
         [Eco, Advanced, LocDescription("The currency owed to the citizen to count.")] public GameValue<Currency> Currency { get; set; }
         [Eco, Advanced, LocDescription("The citizen whose owed payment are being calculated.")] public GameValue<User> Citizen { get; set; }
-        [Eco, Advanced, LocDescription("The Government Account from which the payments are made."), TaxDestinationsOnly] public GameValue<BankAccount> SourceAccount { get; set; }
+        [Eco, Advanced, LocDescription("The Government Account from which the payments are made."), GovernmentAccountsOnly] public GameValue<BankAccount> SourceAccount { get; set; }
 
         private Eval<float> FailNullSafeFloat<T>(Eval<T> eval, string paramName) =>
             eval != null ? Eval.Make($"Invalid {Localizer.DoStr(paramName)} specified on {GetType().GetLocDisplayName()}: {eval.Message}", float.MinValue)

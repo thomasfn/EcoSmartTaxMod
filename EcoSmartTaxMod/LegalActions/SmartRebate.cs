@@ -16,16 +16,18 @@ namespace Eco.Mods.SmartTax
     using Gameplay.Civics.GameValues;
     using Gameplay.Civics.Laws;
     using Gameplay.Economy;
+    using Gameplay.Economy.Transfer;
     using Gameplay.GameActions;
     using Gameplay.Civics.Laws.ExecutiveActions;
     using Gameplay.Aliases;
     using Gameplay.Systems.TextLinks;
     using Gameplay.Players;
+    using Gameplay.Settlements;
 
-    [Eco, LocCategory("Finance"), CreateComponentTab("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Rebate"), HasIcon("Tax_LegalAction"), LocDescription("Issues a rebate which is used to forgive some amount of future or present tax debt.")]
+    [Eco, LocCategory("Finance"), CreateComponentTabLoc("Smart Tax", IconName = "Tax"), LocDisplayName("Smart Rebate"), HasIcon("Tax_LegalAction"), LocDescription("Issues a rebate which is used to forgive some amount of future or present tax debt.")]
     public class SmartRebate_LegalAction : LegalAction, ICustomValidity, IExecutiveAction
     {
-        [Eco, LocDescription("Rebates taxes towards this account. Only Government Accounts are allowed."), TaxDestinationsOnly]
+        [Eco, LocDescription("Rebates taxes towards this account. Only Government Accounts are allowed."), GovernmentAccountsOnly]
         public GameValue<BankAccount> TargetBankAccount { get; set; } = MakeGameValue.Treasury;
 
         [Eco, Advanced, LocDescription("Which currency the rebate is for.")]
@@ -45,11 +47,11 @@ namespace Eco.Mods.SmartTax
 
         public override LocString Description()
             => Localizer.Do($"Issue rebate of {Text.Currency(this.Amount.DescribeNullSafe())} {this.Currency.DescribeNullSafe()} from {this.Target.DescribeNullSafe()} into {this.TargetBankAccount.DescribeNullSafe()}.");
-        protected override PostResult Perform(Law law, GameAction action) => this.Do(law.UILink(), action, law);
-        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, null);
+        protected override PostResult Perform(Law law, GameAction action, AccountChangeSet acc) => this.Do(law.UILinkNullSafe(), action, law?.Settlement);
+        PostResult IExecutiveAction.PerformExecutiveAction(User user, IContextObject context, Settlement jurisdictionSettlement, AccountChangeSet acc) => this.Do(Localizer.Do($"Executive Action by {(user is null ? Localizer.DoStr("the Executive Office") : user.UILink())}"), context, jurisdictionSettlement);
         Result ICustomValidity.Valid() => this.Amount is GameValueWrapper<float> val && val.Object == 0f ? Result.Localize($"Must have non-zero value for amount.") : Result.Succeeded;
 
-        private PostResult Do(LocString description, IContextObject context, Law law)
+        private PostResult Do(LocString description, IContextObject context, Settlement jurisdictionSettlement)
         {
             var targetBankAccount = this.TargetBankAccount?.Value(context).Val;
             var currency = this.Currency?.Value(context).Val;
@@ -60,31 +62,37 @@ namespace Eco.Mods.SmartTax
 
             if (currency == null) { return new PostResult($"Transfer currency must be set.", true); }
             if (targetBankAccount == null) { return new PostResult($"Target bank account must be set.", true); }
+            if (alias == null) { return new PostResult($"Rebate without target citizen skipped.", true); }
 
-            var users = alias?.UserSet.ToArray();
-            if (users == null || users.Length == 0) { return new PostResult($"Rebate without target citizen skipped.", true); }
+            var jurisdiction = Jurisdiction.FromContext(context, jurisdictionSettlement);
+            if (!jurisdiction.TestAccount(targetBankAccount)) { return new PostResult($"{targetBankAccount.MarkedUpName} isn't a government account of {jurisdiction} or held by any of its citizens.", true); }
+            var users = jurisdiction.GetAllowedUsersFromTarget(context, alias, out var jurisdictionDescription, "rebated");
+            if (!users.Any()) { return new PostResult(jurisdictionDescription, true); }
 
             if (silent)
             {
                 return new PostResult(() =>
                 {
-                    RecordRebateForUsers(users, targetBankAccount, currency, rebateCode, amount);
+                    RecordRebateForUsers(jurisdiction.Settlement, users, targetBankAccount, currency, rebateCode, amount);
                 });
             }
             return new PostResult(() =>
             {
-                RecordRebateForUsers(users, targetBankAccount, currency, rebateCode, amount);
-                return Localizer.Do($"Issuing rebate of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {targetBankAccount.UILink()} ({rebateCode})");
+                RecordRebateForUsers(jurisdiction.Settlement, users, targetBankAccount, currency, rebateCode, amount);
+                return Localizer.Do($"Issuing rebate of {currency.UILinkContent(amount)} from {alias.UILinkGeneric()} to {DescribeTarget(jurisdiction, targetBankAccount)} ({rebateCode})");
             });
         }
 
-        private void RecordRebateForUsers(IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string rebateCode, float amount)
+        private void RecordRebateForUsers(Settlement settlement, IEnumerable<User> users, BankAccount targetBankAccount, Currency currency, string rebateCode, float amount)
         {
             foreach (var user in users)
             {
                 var taxCard = TaxCard.GetOrCreateForUser(user);
-                taxCard.RecordRebate(targetBankAccount, currency, rebateCode, amount);
+                taxCard.RecordRebate(settlement, targetBankAccount, currency, rebateCode, amount);
             }
         }
+
+        private static LocString DescribeTarget(Jurisdiction jurisdiction, BankAccount targetAccount)
+            => jurisdiction.IsGlobal ? targetAccount.UILink() : Localizer.Do($"{jurisdiction.Settlement.UILinkNullSafe()} ({targetAccount.UILink()})");
     }
 }

@@ -6,25 +6,27 @@ namespace Eco.Mods.SmartTax
 {
     using Core.Controller;
     using Core.Systems;
-    using Core.Utils;
 
     using Gameplay.Utils;
-    using Gameplay.Systems.Tooltip;
-    using Gameplay.Players;
     using Gameplay.Systems.TextLinks;
+    using Gameplay.Systems.NewTooltip;
+    using Gameplay.Players;
     using Gameplay.Economy;
-    using Gameplay.GameActions;
+    using Gameplay.Items;
+    using Gameplay.Settlements;
 
     using Shared.Serialization;
     using Shared.Localization;
-    using Eco.Shared.Services;
+    using Shared.Items;
 
     [Serialized, ForceCreateView]
-    public class GovTaxCard : SimpleEntry
+    public class GovTaxCard : SimpleEntry, IHasIcon
     {
         [Serialized] public GovernmentBankAccount Account { get; set; }
 
         [Serialized, NotNull] public Reports.Report Report { get; private set; } = new Reports.Report();
+
+        public override string IconName => $"Tax";
 
         public static GovTaxCard GetOrCreateForAccount(GovernmentBankAccount account)
         {
@@ -38,19 +40,19 @@ namespace Eco.Mods.SmartTax
             return taxCard;
         }
 
-        public void RecordTax(Currency currency, string taxCode, float amount)
+        public void RecordTax(Settlement settlement, Currency currency, string taxCode, float amount)
         {
-            Report.RecordTax(Account, currency, taxCode, amount);
+            Report.RecordTax(settlement, Account, currency, taxCode, amount);
         }
 
-        public void RecordPayment(Currency currency, string paymentCode, float amount)
+        public void RecordPayment(Settlement settlement, Currency currency, string paymentCode, float amount)
         {
-            Report.RecordPayment(Account, currency, paymentCode, amount);
+            Report.RecordPayment(settlement, Account, currency, paymentCode, amount);
         }
 
-        public void RecordRebate(Currency currency, string rebateCode, float amount)
+        public void RecordRebate(Settlement settlement, Currency currency, string rebateCode, float amount)
         {
-            Report.RecordRebate(Account, currency, rebateCode, amount);
+            Report.RecordRebate(settlement, Account, currency, rebateCode, amount);
         }
 
         public void OpenReport(Player player)
@@ -58,13 +60,11 @@ namespace Eco.Mods.SmartTax
             player.OpenInfoPanel(Localizer.Do($"Report for {this.UILink()}"), $"{Report.DescriptionNoAccount}", "BankTransactions");
         }
 
-        public override void OnLinkClicked(TooltipContext context, TooltipClickContext clickContext) => OpenReport(context.Player);
+        public override void OnLinkClicked(TooltipOrigin origin, TooltipClickContext clickContext, User user) => OpenReport(user.Player);
 
-        //public override LocString LinkClickedTooltipContent(TooltipContext context) => Localizer.DoStr("Click to view report.");
-        public override LocString UILinkContent() => TextLoc.Icon("Tax", Localizer.DoStr(this.Name));
 
-        [Tooltip(100)]
-        public override LocString Description()
+        [NewTooltip(CacheAs.Disabled, 100)]
+        public LocString Tooltip()
             => Report.TotalReport.Description;
     }
 }
