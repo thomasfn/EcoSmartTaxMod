@@ -41,7 +41,7 @@ namespace Eco.Mods.SmartTax
         }
 
         public static Jurisdiction FromContext(IContextObject context, Settlement settlement)
-            => FeatureConfig.Obj.SettlementSystemEnabled
+            => FeatureConfig.Obj.SettlementEnabled
                 ? new Jurisdiction(
                     true,
                     settlement,

@@ -46,7 +46,7 @@ namespace Eco.Mods.SmartTax
 
         protected virtual void RebuildCachedString()
         {
-            if (FeatureConfig.Obj.SettlementSystemEnabled)
+            if (FeatureConfig.Obj.SettlementEnabled)
             {
                 this.CachedString = BuildString(
                     TimeFormatter.FormatSpan(this.Time),
@@ -309,7 +309,7 @@ namespace Eco.Mods.SmartTax
             if (this.Events.Count >= MaxToShow - 1)
                 sb.AppendLine(Localizer.Do($"(Displaying last {MaxToShow} events.)"));
 
-            if (FeatureConfig.Obj.SettlementSystemEnabled)
+            if (FeatureConfig.Obj.SettlementEnabled)
             {
                 sb.AppendLine(TaxEvent.BuildString(
                     TextLoc.BoldLocStr("Date"),
