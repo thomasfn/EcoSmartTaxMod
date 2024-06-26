@@ -1,9 +1,7 @@
-﻿using System;
-
-namespace Eco.Mods.SmartTax
+﻿namespace Eco.Mods.SmartTax
 {
     using Shared.Localization;
-    using Shared.Utils;
+    using Shared.Logging;
 
     public static class Logger
     {
