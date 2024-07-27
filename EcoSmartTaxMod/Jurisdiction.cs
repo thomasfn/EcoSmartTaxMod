@@ -8,7 +8,6 @@ namespace Eco.Mods.SmartTax
 
     using Gameplay.Economy;
     using Gameplay.Aliases;
-    using Gameplay.Civics.Laws;
     using Gameplay.GameActions;
     using Gameplay.Players;
     using Gameplay.Settlements;
@@ -22,8 +21,8 @@ namespace Eco.Mods.SmartTax
 
     public readonly struct Jurisdiction
     {
-        public static readonly Jurisdiction None = new (true, null, null);
-        public static readonly Jurisdiction Global = new (false, null, null);
+        public static readonly Jurisdiction None = new(restricted: true, settlement: null, additionalCitizens: null);
+        public static readonly Jurisdiction Global = new(restricted: false, settlement: null, additionalCitizens: null);
 
         public readonly bool Restricted;
         public readonly Settlement Settlement;
@@ -37,17 +36,36 @@ namespace Eco.Mods.SmartTax
         {
             Restricted = restricted;
             Settlement = settlement;
-            AdditionalCitizens = additionalCitizens != null ? new HashSet<User>(additionalCitizens) : null;
+            AdditionalCitizens = additionalCitizens?.ToHashSet() ?? new HashSet<User>();
+        }
+
+        private static IEnumerable<User> GetAdditionalCitizensFromContext(IContextObject context)
+        {
+            var result = new HashSet<User>();
+            if (context is IUserGameAction userGameAction && userGameAction.Citizen != null)
+            {
+                // The initiator of the action is considered in-jurisdiction for the duration of the law
+                // e.g. if someone who isn't a citizen comes along and chops a tree inside the settlement boundaries and we try to tax someone...
+                // ...extend the jurisdiction (which normally only covers citizens of the settlement) to include the tree chopper too
+                result.Add(userGameAction.Citizen);
+            }
+            if (context is IWorldObjectGameAction worldObjectGameAction && worldObjectGameAction.WorldObject?.Owners != null)
+            {
+                // The owner of the world object is considered in-jurisdiction for the duration of the law
+                // e.g. if someone who isn't a citizen owns a store inside settlement boundaries and someone buys from the store and we try to tax the seller...
+                result.AddRange(worldObjectGameAction.WorldObject.Owners.UserSet);
+            }
+            return result;
         }
 
         public static Jurisdiction FromContext(IContextObject context, Settlement settlement)
             => FeatureConfig.Obj.SettlementEnabled
-                ? new Jurisdiction(
-                    true,
+                ? new(
+                    restricted: true,
                     settlement,
-                    context is IUserGameAction userGameAction && userGameAction.Citizen != null ? userGameAction.Citizen.SingleItemAsEnumerable() : null
+                    additionalCitizens: GetAdditionalCitizensFromContext(context)
                 )
-                : Jurisdiction.Global;
+                : Global;
 
         public bool TestPosition(Vector2i pos)
             => IsGlobal || (Settlement?.Influences(pos) ?? false);
