@@ -8,9 +8,9 @@ namespace Eco.Mods.SmartTax.Reports
     using Gameplay.Economy;
     using Gameplay.Settlements;
 
-    using Shared.Utils;
     using Shared.Serialization;
     using Shared.Localization;
+    using Shared.Time;
 
     using Simulation.Time;
 
