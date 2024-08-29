@@ -1,5 +1,5 @@
 # Eco Smart Tax Mod
-A server mod for Eco 10.0 that extends the law and economy system with the following:
+A server mod for Eco 11.0 that extends the law and economy system with the following:
  - A smart tax legal action that defers collection to avoid transaction spam, and tracks debt if the citizen can't pay
  - A smart payment legal action that tracks credit if the government can't pay, and can be used to pay off tax debt
  - A smart rebate legal action that cancels out tax debt without being backed by currency
@@ -226,7 +226,7 @@ The tax card is stored in the game save along with all other objects such as ban
 
 ### Linux
 
-1. Run `ECO_BRANCH="release" MODKIT_VERSION="0.10.0.0-beta" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
+1. Run `ECO_BRANCH="release" MODKIT_VERSION="0.11.0.0-beta" fetch-eco-reference-assemblies.sh` (change the modkit branch and version as needed)
 2. Enter the `EcoSmartTaxMod` directory and run:
 `dotnet restore`
 `dotnet build`
