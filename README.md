@@ -1,5 +1,5 @@
 # Eco Smart Tax Mod
-A server mod for Eco 11.1 that extends the law and economy system with the following:
+A server mod for Eco 14.2 that extends the law and economy system with the following:
  - A smart tax legal action that defers collection to avoid transaction spam, and tracks debt if the citizen can't pay
  - A smart payment legal action that tracks credit if the government can't pay, and can be used to pay off tax debt
  - A smart rebate legal action that cancels out tax debt without being backed by currency
@@ -218,16 +218,16 @@ The tax card is stored in the game save along with all other objects such as ban
 
 ### Windows
 
-1. Open `EcoSmartTaxMod.sln` in Visual Studio 2019/2022
+1. Open `EcoSmartTaxMod.sln` in Visual Studio 2019 (or later)
 2. Build the `EcoSmartTaxMod` project in Visual Studio
-3. Find the artifact in `EcoSmartTaxMod\bin\{Debug|Release}\net8.0`
+3. Find the artifact in `EcoSmartTaxMod\bin\{Debug|Release}\net10.0`
 
 ### Linux
 
 1. Enter the `EcoSmartTaxMod` directory and run:
 `dotnet restore`
 `dotnet build`
-2. Find the artifact in `EcoSmartTaxMod/bin/{Debug|Release}/net8.0`
+2. Find the artifact in `EcoSmartTaxMod/bin/{Debug|Release}/net10.0`
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
